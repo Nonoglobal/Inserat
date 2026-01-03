@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scroll-Triggered Video</title>
+
+<!-- ========================= -->
+<!-- STYLES (GLOBAL + VIDEO) -->
+<!-- ========================= -->
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        background: #000;
+        font-family: Arial, sans-serif;
+        color: white;
+    }
+
+    .video-section {
+        position: relative;
+        height: 100vh;
+    }
+
+    video {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    video.ready {
+        opacity: 1;
+    }
+
+    video.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .content-section {
+        position: relative;
+        min-height: 100vh;
+        background: linear-gradient(to bottom, #000, #1a1a2e);
+        padding: 100px 50px;
+        z-index: 10;
+    }
+
+    .content-wrapper {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    h1 {
+        font-size: 4rem;
+        margin-bottom: 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    p {
+        font-size: 1.5rem;
+        line-height: 1.8;
+        margin-bottom: 20px;
+        color: #ccc;
+    }
+
+    .highlight {
+        color: #667eea;
+        font-weight: bold;
+    }
+
+    .loading {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 20px;
+        text-shadow: 0 0 10px rgba(0,0,0,0.8);
+        z-index: 100;
+    }
+</style>
+</head>
+
+<body>
+
+<!-- ========================= -->
+<!-- VIDEO: LOADING STATUS -->
+<!-- ========================= -->
+<div class="loading" id="loading">Video wird vorbereitet...</div>
+
+<!-- ========================= -->
+<!-- VIDEO: SCROLL-BEREICH -->
+<!-- ========================= -->
+<div class="video-section" id="videoSection"></div>
+
+<video id="scrollVideo" preload="auto" muted playsinline>
+    <source src="BLOCK1.mp4" type="video/mp4">
+</video>
+
+<!-- ========================= -->
+<!-- CONTENT NACH DEM VIDEO -->
+<!-- ========================= -->
+<div class="content-section">
+    <div class="content-wrapper">
+        <h1>Willkommen!</h1>
+        <p>Das Video ist jetzt zu Ende. Du hast das <span class="highlight">komplette Video</span> durch Scrollen durchgespielt!</p>
+        <p>Diese Technik nennt sich <span class="highlight">Scroll-gesteuerte Video-Wiedergabe</span> und wird oft für interaktive Storytelling-Experiences verwendet.</p>
+        <p>Scrolle weiter nach unten für mehr Inhalt...</p>
+        <br><br>
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+    </div>
+</div>
+
+<!-- ========================= -->
+<!-- JAVASCRIPT: VIDEO LOGIK -->
+<!-- ========================= -->
+<script>
+const video = document.getElementById("scrollVideo");
+const videoSection = document.getElementById("videoSection");
+const loading = document.getElementById("loading");
+
+const PLAY_DURATION = 1;
+let isPlaying = false;
+let isVideoReady = false;
+let isPrimed = false;
+let videoComplete = false;
+let lastScrollY = 0;
+let lastScrollTime = 0;
+const SCROLL_DEBOUNCE = 150;
+let scrollLocked = false;
+
+video.addEventListener('loadedmetadata', () => {
+    console.log('Video Metadaten geladen');
+    primeVideo();
+});
+
+video.addEventListener('error', (e) => {
+    loading.textContent = 'Fehler: Video nicht gefunden';
+    loading.style.color = '#ff4444';
+});
+
+async function primeVideo() {
+    try {
+        video.currentTime = 0;
+        await video.play();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        video.pause();
+        video.currentTime = 0;
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        isPrimed = true;
+        isVideoReady = true;
+        loading.style.display = 'none';
+        video.classList.add('ready');
+    } catch (err) {
+        isPrimed = true;
+        isVideoReady = true;
+        loading.style.display = 'none';
+        video.classList.add('ready');
+    }
+}
+
+window.addEventListener('scroll', (e) => {
+    const currentScrollY = window.scrollY;
+    
+    if (currentScrollY === 0) {
+        videoComplete = false;
+        video.classList.remove('hidden');
+        lastScrollY = 0;
+        return;
+    }
+
+    if (videoComplete && currentScrollY > window.innerHeight) {
+        video.classList.add('hidden');
+        lastScrollY = currentScrollY;
+        return;
+    }
+
+    if (!videoComplete) {
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastScrollTime < SCROLL_DEBOUNCE || scrollLocked) {
+            window.scrollTo(0, lastScrollY);
+            return;
+        }
+        lastScrollTime = now;
+        const scrollDirection = currentScrollY > lastScrollY ? 'down' : 'up';
+        window.scrollTo(0, lastScrollY);
+        if (isVideoReady && !isPlaying) {
+            playVideoForDuration(scrollDirection);
+        }
+    } else {
+        lastScrollY = currentScrollY;
+    }
+}, { passive: false });
+
+function playVideoForDuration(direction) {
+    if (isPlaying) return;
+    isPlaying = true;
+    scrollLocked = true;
+
+    if (direction === 'down') {
+        video.play();
+        setTimeout(() => {
+            video.pause();
+            isPlaying = false;
+            scrollLocked = false;
+            if (video.currentTime >= video.duration - 0.2) {
+                videoComplete = true;
+                video.classList.add('hidden');
+                window.scrollTo(0, window.innerHeight);
+            }
+        }, PLAY_DURATION * 1000);
+    }
+}
+</script>
+
+</body>
+</html>
