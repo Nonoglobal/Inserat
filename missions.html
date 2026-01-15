@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATLAS - Mission Archives</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background: #050505;
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        #sidebar {
+            width: 320px;
+            background: #0a0a0a;
+            border-right: 1px solid #222;
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+        }
+
+        .header {
+            padding: 20px;
+            border-bottom: 1px solid #222;
+            background: linear-gradient(180deg, #111 0%, #0a0a0a 100%);
+        }
+
+        .title {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #ffaa00;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .title::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #ffaa00;
+            box-shadow: 0 0 10px #ffaa00;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 10px #ffaa00; }
+            50% { opacity: 0.5; box-shadow: 0 0 20px #ffaa00; }
+        }
+
+        .conflict-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .conflict-list::-webkit-scrollbar { width: 4px; }
+        .conflict-list::-webkit-scrollbar-track { background: #111; }
+        .conflict-list::-webkit-scrollbar-thumb { background: #333; }
+
+        .country-group { border-bottom: 1px solid #1a1a1a; }
+
+        .country-header {
+            padding: 12px 20px;
+            background: #111;
+            font-size: 11px;
+            font-weight: 700;
+            color: #666;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            transition: all 0.3s;
+        }
+
+        .country-header:hover { color: #ffaa00; background: #151515; }
+
+        .conflict-item {
+            padding: 10px 20px 10px 30px;
+            font-size: 10px;
+            color: #555;
+            cursor: pointer;
+            border-left: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .conflict-item:hover {
+            background: rgba(255, 170, 0, 0.05);
+            color: #fff;
+            border-left-color: #333;
+        }
+
+        .conflict-item.active {
+            border-left-color: #ffaa00;
+            background: rgba(255, 170, 0, 0.1);
+            color: #ffaa00;
+        }
+
+        .conflict-year {
+            font-size: 9px;
+            opacity: 0.6;
+            margin-right: 8px;
+        }
+
+        #main {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #map {
+            flex: 1;
+            background: #000;
+        }
+
+        .overlay-ui {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .top-bar {
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .mission-info {
+            background: rgba(0,0,0,0.9);
+            border: 1px solid #333;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            max-width: 380px;
+            pointer-events: auto;
+        }
+
+        .mission-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .mission-meta {
+            font-size: 10px;
+            color: #ffaa00;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+
+        .mission-desc {
+            font-size: 11px;
+            line-height: 1.6;
+            color: #aaa;
+            margin-bottom: 15px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .actors-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 9px;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+        }
+
+        .actor-col strong { display: block; color: #666; margin-bottom: 5px; }
+
+        .timeline-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.95);
+            border: 1px solid #333;
+            padding: 15px 25px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 1000;
+            border-radius: 4px;
+        }
+
+        .phase-btn {
+            background: transparent;
+            border: 1px solid #333;
+            color: #555;
+            padding: 8px 12px;
+            font-family: inherit;
+            font-size: 9px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 70px;
+        }
+
+        .phase-btn:hover { border-color: #ffaa00; color: #ffaa00; }
+        .phase-btn.active { 
+            background: #ffaa00; 
+            color: #000; 
+            border-color: #ffaa00; 
+            font-weight: bold;
+            transform: scale(1.05);
+        }
+
+        .play-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid #ffaa00;
+            color: #ffaa00;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .play-btn:hover { background: #ffaa00; color: #000; transform: scale(1.1); }
+
+        #close-btn {
+            pointer-events: auto;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #333;
+            color: #fff;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #close-btn:hover { background: #fff; color: #000; }
+
+        /* NATO SYMBOLS */
+        .unit-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+            transition: all 0.5s ease;
+        }
+
+        .nato-symbol {
+            width: 40px;
+            height: 26px;
+            border: 2px solid;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .unit-size {
+            font-size: 7px;
+            color: #fff;
+            margin-top: 1px;
+            text-shadow: 0 1px 2px #000;
+        }
+
+        .unit-label {
+            font-size: 8px;
+            color: #fff;
+            margin-top: 2px;
+            text-shadow: 0 1px 3px #000;
+            white-space: nowrap;
+            background: rgba(0,0,0,0.6);
+            padding: 1px 4px;
+            border-radius: 2px;
+        }
+
+        .faction-blue { border-color: #00c8ff; color: #00c8ff; }
+        .faction-red { border-color: #ff3333; color: #ff3333; }
+
+        .unit-container.destroyed {
+            opacity: 0.4;
+            filter: grayscale(1);
+        }
+        .unit-container.destroyed::after {
+            content: '✕';
+            position: absolute;
+            color: #ff0000;
+            font-size: 30px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #ff0000;
+        }
+
+        .unit-container.retreating {
+            animation: retreatBlink 0.5s infinite;
+        }
+
+        .unit-container.encircled {
+            animation: encircledPulse 1s infinite;
+        }
+
+        .unit-container.highlight {
+            animation: highlightGlow 1s infinite;
+        }
+
+        @keyframes retreatBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        @keyframes encircledPulse {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 5px #ff0000); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 15px #ff0000); }
+        }
+
+        @keyframes highlightGlow {
+            0%, 100% { filter: drop-shadow(0 0 5px #ffcc00); }
+            50% { filter: drop-shadow(0 0 20px #ffcc00); }
+        }
+
+        /* ARROWS */
+        .arrow-label-text {
+            background: rgba(0,0,0,0.9);
+            color: #ffaa00;
+            padding: 3px 8px;
+            font-size: 9px;
+            font-weight: bold;
+            border: 1px solid #ffaa00;
+            white-space: nowrap;
+            text-shadow: 0 0 5px #000;
+        }
+
+        /* EFFECTS */
+        .victory-star {
+            font-size: 40px;
+            color: #ffcc00;
+            text-shadow: 0 0 20px #ffcc00, 0 0 40px #ffaa00;
+            animation: victoryPulse 1s infinite;
+        }
+
+        @keyframes victoryPulse {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.3) rotate(10deg); }
+        }
+
+        /* LEAFLET DARK */
+        .leaflet-tile-pane { filter: brightness(0.35) contrast(1.3) saturate(0.7); }
+        .leaflet-container { background: #000 !important; }
+
+        /* FRONTLINE */
+        @keyframes frontlineDash {
+            to { stroke-dashoffset: -20; }
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div class="header">
+            <div class="title">CONFLICT ARCHIVE</div>
+        </div>
+        <div class="conflict-list" id="conflict-list"></div>
+    </div>
+
+    <div id="main">
+        <div id="map"></div>
+
+        <div class="overlay-ui top-bar">
+            <div class="mission-info" id="mission-info" style="display:none;">
+                <div class="mission-title" id="m-title">SELECT A CONFLICT</div>
+                <div class="mission-meta" id="m-meta"></div>
+                <div class="mission-desc" id="m-desc"></div>
+                <div class="actors-grid">
+                    <div class="actor-col">
+                        <strong>⬤ ATTACKER</strong>
+                        <div id="m-attacker"></div>
+                    </div>
+                    <div class="actor-col">
+                        <strong>⬤ DEFENDER</strong>
+                        <div id="m-defender"></div>
+                    </div>
+                </div>
+            </div>
+            <button id="close-btn" onclick="closeModule()">×</button>
+        </div>
+
+        <div class="timeline-controls" id="timeline-controls" style="display:none;">
+            <button class="play-btn" id="play-btn" onclick="playAnimation()">▶</button>
+            <div id="phase-buttons" style="display:flex; gap:5px; flex-wrap:wrap;"></div>
+            <div style="margin-left:15px; font-size:9px; color:#666;">
+                <span id="phase-counter">1/1</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-polylinedecorator/1.6.0/leaflet.polylineDecorator.min.js"></script>
+    <script src="http://localhost:3001/atlas-api.js"></script>
+    <script>
+// =====================================================
+// ATLAS MISSION ARCHIVES - ENHANCED ANIMATION ENGINE
+// =====================================================
+
+// CONFLICT DATABASE
+let conflicts = {
+    "ISRAEL / PALESTINE": [
+        {
+            id: "six_day_war",
+            name: "Six-Day War",
+            year: "1967",
+            region: "Middle East",
+            desc: "Israel's preemptive strike against Egypt, Syria, and Jordan. One of the most decisive military victories in modern history.",
+            attacker: { name: "Israel (IDF)", equipment: "Centurion, M48 Patton, Mirage III" },
+            defender: { name: "Egypt, Syria, Jordan", equipment: "T-54/55, MiG-21, MiG-19" },
+            center: [31.0, 34.5],
+            zoom: 7,
+            phases: [
+                {
+                    name: "DEPLOYMENT",
+                    date: "June 4, 1967",
+                    desc: "Arab forces mass on Israeli borders. Egypt closes Straits of Tiran. Israel mobilizes reserves.",
+                    units: [
+                        { type: "armor", faction: "red", pos: [30.5, 33.5], label: "EGY 4th Div", size: "XX" },
+                        { type: "armor", faction: "red", pos: [30.8, 34.0], label: "EGY 7th Div", size: "XX" },
+                        { type: "infantry", faction: "red", pos: [31.0, 33.0], label: "EGY 2nd Div", size: "XX" },
+                        { type: "armor", faction: "red", pos: [33.1, 35.8], label: "SYR 1st Arm", size: "X" },
+                        { type: "armor", faction: "red", pos: [32.0, 35.9], label: "JOR 40th Arm", size: "X" },
+                        { type: "armor", faction: "blue", pos: [31.3, 34.5], label: "IDF 7th Bde", size: "X" },
+                        { type: "armor", faction: "blue", pos: [31.5, 34.6], label: "IDF 84th Div", size: "XX" },
+                        { type: "air", faction: "blue", pos: [32.0, 34.8], label: "IAF", size: "★" }
+                    ],
+                    frontline: [[31.25, 34.27], [30.9, 34.2], [30.5, 34.4], [29.5, 34.9]],
+                    effects: [{ type: "tension", pos: [31.0, 34.3] }]
+                },
+                {
+                    name: "OPERATION FOCUS",
+                    date: "June 5, 07:45",
+                    desc: "Israel launches devastating air strike. 300+ Egyptian aircraft destroyed on ground within hours. Total air superiority achieved.",
+                    units: [
+                        { type: "air", faction: "blue", pos: [31.8, 34.65], label: "IAF Strike", size: "★", movement: { to: [30.1, 31.4], speed: 2000 } },
+                        { type: "air", faction: "blue", pos: [31.5, 34.5], label: "IAF 2nd Wave", size: "II", movement: { to: [30.5, 32.5], speed: 2200 } },
+                        { type: "air", faction: "red", pos: [30.1, 31.4], label: "EAF (destroyed)", size: "★", destroyed: true }
+                    ],
+                    arrows: [
+                        { from: [31.8, 34.65], to: [30.1, 31.4], color: "#00c8ff", label: "AIR STRIKE" },
+                        { from: [31.5, 34.5], to: [30.5, 32.5], color: "#00c8ff" }
+                    ],
+                    effects: [
+                        { type: "explosion", pos: [30.1, 31.4], delay: 2000 },
+                        { type: "explosion", pos: [30.5, 32.5], delay: 2500 }
+                    ]
+                },
+                {
+                    name: "SINAI OFFENSIVE",
+                    date: "June 5-8",
+                    desc: "Israeli armored divisions thunder across Sinai. Egyptian forces collapse. IDF reaches Suez Canal in 3 days.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [31.25, 34.35], label: "Tal Division", size: "XX", movement: { to: [30.5, 33.0], speed: 3000 } },
+                        { type: "armor", faction: "blue", pos: [31.0, 34.45], label: "Sharon Div", size: "XX", movement: { to: [29.5, 32.5], speed: 3500 } },
+                        { type: "armor", faction: "blue", pos: [30.5, 34.5], label: "Yoffe Div", size: "XX", movement: { to: [29.0, 33.0], speed: 4000 } },
+                        { type: "armor", faction: "red", pos: [30.0, 32.5], label: "EGY 4th (retreat)", size: "XX", retreating: true, movement: { to: [29.5, 32.0], speed: 2000 } }
+                    ],
+                    arrows: [
+                        { from: [31.25, 34.35], to: [30.5, 33.0], color: "#00c8ff", label: "NORTH AXIS" },
+                        { from: [31.0, 34.45], to: [29.5, 32.5], color: "#00c8ff", label: "CENTER AXIS" },
+                        { from: [30.5, 34.5], to: [29.0, 33.0], color: "#00c8ff", label: "SOUTH AXIS" }
+                    ],
+                    frontline: [[31.0, 34.0], [30.0, 33.0], [29.0, 33.0], [28.5, 33.5]],
+                    effects: [
+                        { type: "dust", pos: [30.5, 33.5] },
+                        { type: "battle", pos: [30.2, 33.2] }
+                    ]
+                },
+                {
+                    name: "JERUSALEM",
+                    date: "June 5-7",
+                    desc: "Fierce battle for Jerusalem. Paratroopers storm the Old City. West Bank falls to Israeli forces.",
+                    units: [
+                        { type: "infantry", faction: "blue", pos: [31.78, 35.2], label: "55th Para", size: "X", movement: { to: [31.78, 35.23], speed: 2000 } },
+                        { type: "armor", faction: "blue", pos: [32.0, 35.0], label: "Harel Bde", size: "X", movement: { to: [32.3, 35.3], speed: 3000 } },
+                        { type: "infantry", faction: "red", pos: [31.78, 35.23], label: "Jordan Legion", size: "X", retreating: true }
+                    ],
+                    arrows: [
+                        { from: [31.78, 35.2], to: [31.78, 35.23], color: "#00c8ff", label: "OLD CITY" }
+                    ],
+                    effects: [{ type: "urbanBattle", pos: [31.78, 35.22] }]
+                },
+                {
+                    name: "GOLAN HEIGHTS",
+                    date: "June 9-10",
+                    desc: "Final phase. Israeli forces storm heavily fortified Syrian positions on Golan Heights.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [32.8, 35.5], label: "Golani Bde", size: "X", movement: { to: [33.0, 35.8], speed: 2500 } },
+                        { type: "infantry", faction: "blue", pos: [32.9, 35.6], label: "8th Armored", size: "X", movement: { to: [33.1, 35.9], speed: 3000 } },
+                        { type: "armor", faction: "red", pos: [33.2, 36.0], label: "Syrian Army", size: "XX", retreating: true }
+                    ],
+                    arrows: [
+                        { from: [32.8, 35.5], to: [33.0, 35.8], color: "#00c8ff", label: "ASSAULT" }
+                    ],
+                    frontline: [[33.3, 35.8], [33.0, 35.85], [32.7, 35.8]],
+                    effects: [{ type: "battle", pos: [33.0, 35.85] }]
+                },
+                {
+                    name: "VICTORY",
+                    date: "June 10",
+                    desc: "UN ceasefire. Israel controls Sinai, West Bank, Gaza, and Golan Heights. Map of Middle East changed forever.",
+                    units: [
+                        { type: "flag", faction: "blue", pos: [29.5, 32.5], label: "SINAI", size: "⚑" },
+                        { type: "flag", faction: "blue", pos: [31.78, 35.22], label: "JERUSALEM", size: "⚑" },
+                        { type: "flag", faction: "blue", pos: [33.0, 35.85], label: "GOLAN", size: "⚑" }
+                    ],
+                    frontline: [[33.3, 35.85], [32.5, 35.5], [31.2, 35.2], [30.0, 34.5], [28.0, 33.0], [29.5, 32.55]],
+                    effects: [{ type: "victory", pos: [31.0, 34.5] }]
+                }
+            ]
+        },
+        {
+            id: "yom_kippur",
+            name: "Yom Kippur War",
+            year: "1973",
+            region: "Sinai / Golan",
+            desc: "Surprise attack by Egypt and Syria on holiest Jewish holiday. Israel nearly overwhelmed before dramatic counterattack.",
+            attacker: { name: "Egypt, Syria", equipment: "T-62, BMP-1, Sagger ATGM, SA-6 SAM" },
+            defender: { name: "Israel (IDF)", equipment: "M60 Patton, Centurion, F-4 Phantom" },
+            center: [31.0, 34.0],
+            zoom: 7,
+            phases: [
+                {
+                    name: "SURPRISE",
+                    date: "Oct 6, 14:00",
+                    desc: "On Yom Kippur, Egypt and Syria launch coordinated assault. Egyptian forces cross Suez Canal. Syrians storm Golan.",
+                    units: [
+                        { type: "armor", faction: "red", pos: [30.5, 32.3], label: "EGY 2nd Army", size: "XXX", movement: { to: [30.5, 32.8], speed: 2500 } },
+                        { type: "armor", faction: "red", pos: [30.0, 32.3], label: "EGY 3rd Army", size: "XXX", movement: { to: [30.0, 32.7], speed: 2500 } },
+                        { type: "armor", faction: "red", pos: [33.3, 36.0], label: "SYR 1st Div", size: "XX", movement: { to: [33.0, 35.8], speed: 2000 } },
+                        { type: "armor", faction: "blue", pos: [30.5, 33.5], label: "IDF 252nd", size: "XX" }
+                    ],
+                    arrows: [
+                        { from: [30.5, 32.3], to: [30.5, 32.8], color: "#ff3333", label: "SUEZ CROSSING" },
+                        { from: [33.3, 36.0], to: [33.0, 35.8], color: "#ff3333", label: "GOLAN ASSAULT" }
+                    ],
+                    frontline: [[30.8, 32.5], [30.2, 32.5], [29.8, 32.5]],
+                    effects: [
+                        { type: "crossing", pos: [30.3, 32.5] },
+                        { type: "battle", pos: [33.1, 35.85] }
+                    ]
+                },
+                {
+                    name: "DEFENSE",
+                    date: "Oct 6-8",
+                    desc: "Outnumbered Israeli forces fight desperate defense. Tank battles rage. IDF reserves race to front.",
+                    units: [
+                        { type: "armor", faction: "red", pos: [30.5, 33.2], label: "Egyptian Armor", size: "XX" },
+                        { type: "armor", faction: "red", pos: [33.0, 35.7], label: "Syrian T-62s", size: "XX", movement: { to: [32.9, 35.65], speed: 2000 } },
+                        { type: "armor", faction: "blue", pos: [30.8, 34.0], label: "IDF Reserves", size: "XX", movement: { to: [30.6, 33.5], speed: 3000 } },
+                        { type: "armor", faction: "blue", pos: [32.8, 35.5], label: "IDF 7th Bde", size: "X", highlight: true }
+                    ],
+                    frontline: [[31.0, 33.0], [30.5, 33.2], [30.0, 33.0], [29.5, 32.8]],
+                    effects: [
+                        { type: "battle", pos: [30.6, 33.3] },
+                        { type: "epicBattle", pos: [32.9, 35.7] }
+                    ]
+                },
+                {
+                    name: "VALLEY OF TEARS",
+                    date: "Oct 6-9",
+                    desc: "On Golan, IDF 7th Brigade makes legendary stand. 100 Israeli tanks vs 500 Syrian. Syrians stopped.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [33.0, 35.75], label: "7th Brigade", size: "X", highlight: true },
+                        { type: "armor", faction: "red", pos: [33.1, 35.85], label: "SYR 1st Div", size: "XX", destroyed: true },
+                        { type: "armor", faction: "red", pos: [33.05, 35.8], label: "SYR 3rd Div", size: "XX", retreating: true }
+                    ],
+                    effects: [
+                        { type: "epicBattle", pos: [33.0, 35.8] },
+                        { type: "explosion", pos: [33.05, 35.82], delay: 1000 },
+                        { type: "explosion", pos: [33.02, 35.78], delay: 1500 }
+                    ]
+                },
+                {
+                    name: "COUNTER",
+                    date: "Oct 15-17",
+                    desc: "Sharon's division crosses Suez Canal. Encircles Egyptian 3rd Army. Tide turns dramatically.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [30.5, 33.0], label: "Sharon Div", size: "XX", movement: { to: [30.3, 32.3], speed: 3500 } },
+                        { type: "armor", faction: "blue", pos: [30.4, 32.8], label: "Adan Div", size: "XX", movement: { to: [30.1, 32.4], speed: 4000 } },
+                        { type: "armor", faction: "red", pos: [30.0, 32.8], label: "3rd Army", size: "XXX", encircled: true }
+                    ],
+                    arrows: [
+                        { from: [30.5, 33.0], to: [30.3, 32.3], color: "#00c8ff", label: "CANAL CROSSING" }
+                    ],
+                    effects: [
+                        { type: "crossing", pos: [30.4, 32.6] },
+                        { type: "encirclement", pos: [30.0, 32.7] }
+                    ]
+                },
+                {
+                    name: "CEASEFIRE",
+                    date: "Oct 25",
+                    desc: "UN Resolution 338. Egyptian 3rd Army encircled but intact. Both sides claim victory.",
+                    units: [
+                        { type: "flag", faction: "blue", pos: [30.3, 32.3], label: "IDF WEST", size: "⚑" },
+                        { type: "armor", faction: "red", pos: [30.0, 32.8], label: "3rd Army", size: "XXX", encircled: true }
+                    ],
+                    effects: [{ type: "ceasefire", pos: [30.5, 32.5] }]
+                }
+            ]
+        },
+        {
+            id: "gaza_2023",
+            name: "Gaza War (Iron Swords)",
+            year: "Oct 2023",
+            region: "Gaza / Israel",
+            desc: "Following devastating Hamas attack on October 7, Israel launches largest military operation in decades.",
+            attacker: { name: "Hamas / PIJ", equipment: "Rockets, Tunnels, Paragliders" },
+            defender: { name: "Israel (IDF)", equipment: "Merkava IV, F-35, Iron Dome" },
+            center: [31.4, 34.4],
+            zoom: 10,
+            phases: [
+                {
+                    name: "OCT 7 ATTACK",
+                    date: "Oct 7, 06:30",
+                    desc: "Hamas launches unprecedented assault. 3,000+ rockets. Terrorists breach border. Kibbutzim attacked.",
+                    units: [
+                        { type: "infantry", faction: "red", pos: [31.35, 34.35], label: "Hamas", size: "X", movement: { to: [31.45, 34.5], speed: 2000 } },
+                        { type: "infantry", faction: "red", pos: [31.4, 34.38], label: "Nukhba", size: "II", movement: { to: [31.5, 34.55], speed: 2500 } }
+                    ],
+                    arrows: [
+                        { from: [31.35, 34.35], to: [31.45, 34.5], color: "#ff3333", label: "INFILTRATION" },
+                        { from: [31.4, 34.38], to: [31.5, 34.55], color: "#ff3333" }
+                    ],
+                    effects: [
+                        { type: "rockets", pos: [31.5, 34.5] },
+                        { type: "breach", pos: [31.4, 34.42] }
+                    ]
+                },
+                {
+                    name: "AIR CAMPAIGN",
+                    date: "Oct 7-27",
+                    desc: "Massive air campaign. IAF strikes 12,000+ targets. Ground invasion prepared. 360,000 reservists mobilized.",
+                    units: [
+                        { type: "air", faction: "blue", pos: [31.6, 34.6], label: "IAF", size: "★", movement: { to: [31.45, 34.42], speed: 2000 } },
+                        { type: "armor", faction: "blue", pos: [31.55, 34.55], label: "IDF Staging", size: "XX" },
+                        { type: "infantry", faction: "red", pos: [31.45, 34.42], label: "Hamas HQ", size: "X" }
+                    ],
+                    arrows: [
+                        { from: [31.6, 34.6], to: [31.45, 34.42], color: "#00c8ff", label: "AIR STRIKES" }
+                    ],
+                    effects: [
+                        { type: "airstrike", pos: [31.45, 34.42] },
+                        { type: "explosion", pos: [31.46, 34.43], delay: 500 }
+                    ]
+                },
+                {
+                    name: "GROUND WAR",
+                    date: "Oct 27+",
+                    desc: "IDF ground forces enter northern Gaza. Encircle Gaza City. Intense urban combat.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [31.55, 34.5], label: "36th Div", size: "XX", movement: { to: [31.52, 34.45], speed: 3000 } },
+                        { type: "armor", faction: "blue", pos: [31.5, 34.55], label: "162nd Div", size: "XX", movement: { to: [31.48, 34.48], speed: 3500 } },
+                        { type: "infantry", faction: "red", pos: [31.5, 34.43], label: "Hamas", size: "X" }
+                    ],
+                    arrows: [
+                        { from: [31.55, 34.5], to: [31.52, 34.45], color: "#00c8ff", label: "NORTH AXIS" },
+                        { from: [31.5, 34.55], to: [31.48, 34.48], color: "#00c8ff" }
+                    ],
+                    frontline: [[31.53, 34.42], [31.5, 34.45], [31.47, 34.42]],
+                    effects: [{ type: "urbanBattle", pos: [31.5, 34.45] }]
+                },
+                {
+                    name: "KHAN YOUNIS",
+                    date: "Dec 2023+",
+                    desc: "IDF expands south. Major operations in Khan Younis. Targeting Hamas leadership.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [31.48, 34.45], label: "98th Div", size: "XX", movement: { to: [31.35, 34.3], speed: 3000 } },
+                        { type: "infantry", faction: "red", pos: [31.35, 34.3], label: "Hamas KY", size: "X" }
+                    ],
+                    arrows: [
+                        { from: [31.48, 34.45], to: [31.35, 34.3], color: "#00c8ff" }
+                    ],
+                    frontline: [[31.5, 34.45], [31.4, 34.4], [31.35, 34.35]],
+                    effects: [{ type: "urbanBattle", pos: [31.35, 34.3] }]
+                },
+                {
+                    name: "RAFAH",
+                    date: "May 2024+",
+                    desc: "IDF enters Rafah. Philadelphi Corridor secured. Hamas' last stronghold targeted.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [31.3, 34.35], label: "IDF South", size: "XX", movement: { to: [31.25, 34.25], speed: 3000 } },
+                        { type: "infantry", faction: "red", pos: [31.23, 34.23], label: "Hamas Rafah", size: "II" }
+                    ],
+                    arrows: [
+                        { from: [31.3, 34.35], to: [31.25, 34.25], color: "#00c8ff", label: "RAFAH OP" }
+                    ],
+                    frontline: [[31.3, 34.4], [31.27, 34.3], [31.22, 34.22]],
+                    effects: [{ type: "urbanBattle", pos: [31.25, 34.25] }]
+                }
+            ]
+        }
+    ],
+    "SYRIA": [
+        {
+            id: "syrian_civil",
+            name: "Syrian Civil War",
+            year: "2011-Present",
+            region: "Syria",
+            desc: "Multi-sided civil war. Assad vs rebels vs ISIS vs Kurds. Russian and US intervention.",
+            attacker: { name: "Rebels / ISIS / HTS", equipment: "T-55, Technicals, VBIEDs" },
+            defender: { name: "Syria / Russia", equipment: "T-90, Su-34, Su-24" },
+            center: [35.0, 38.0],
+            zoom: 7,
+            phases: [
+                {
+                    name: "UPRISING",
+                    date: "2011",
+                    desc: "Arab Spring protests spread. Assad responds with force. Defections begin.",
+                    units: [
+                        { type: "infantry", faction: "red", pos: [33.5, 36.3], label: "Protests", size: "●" },
+                        { type: "infantry", faction: "red", pos: [32.62, 36.1], label: "Daraa", size: "●" },
+                        { type: "armor", faction: "blue", pos: [33.52, 36.32], label: "SAA 4th Div", size: "XX" }
+                    ],
+                    effects: [{ type: "unrest", pos: [33.5, 36.3] }]
+                },
+                {
+                    name: "REBELLION",
+                    date: "2012",
+                    desc: "FSA forms. Rebels seize territory in north. Damascus suburbs contested.",
+                    units: [
+                        { type: "infantry", faction: "red", pos: [36.2, 37.1], label: "FSA North", size: "X", movement: { to: [35.5, 36.5], speed: 3000 } },
+                        { type: "armor", faction: "blue", pos: [33.5, 36.3], label: "Damascus", size: "★" }
+                    ],
+                    arrows: [
+                        { from: [36.2, 37.1], to: [35.5, 36.5], color: "#ff3333" }
+                    ],
+                    frontline: [[36.5, 36.5], [35.5, 37.5], [34.5, 38.0]],
+                    effects: [{ type: "battle", pos: [35.8, 37.0] }]
+                },
+                {
+                    name: "ISIS RISE",
+                    date: "2014",
+                    desc: "ISIS captures Raqqa. Declares caliphate. Sweeps across eastern Syria.",
+                    units: [
+                        { type: "infantry", faction: "red", pos: [35.95, 39.0], label: "ISIS", size: "XXX", movement: { to: [35.5, 38.5], speed: 2500 } },
+                        { type: "armor", faction: "blue", pos: [34.5, 38.5], label: "SAA", size: "XX" }
+                    ],
+                    arrows: [
+                        { from: [35.95, 39.0], to: [35.5, 38.5], color: "#000000", label: "ISIS EXPANSION" }
+                    ],
+                    effects: [{ type: "terror", pos: [35.95, 39.0] }]
+                },
+                {
+                    name: "RUSSIA",
+                    date: "Sep 2015",
+                    desc: "Russia begins airstrikes supporting Assad. Tide turns against rebels.",
+                    units: [
+                        { type: "air", faction: "blue", pos: [35.4, 35.95], label: "RuAF Hmeim", size: "★", movement: { to: [35.8, 36.8], speed: 2000 } },
+                        { type: "infantry", faction: "red", pos: [35.8, 36.8], label: "Rebels", size: "X" }
+                    ],
+                    arrows: [
+                        { from: [35.4, 35.95], to: [35.8, 36.8], color: "#00c8ff", label: "AIR STRIKES" }
+                    ],
+                    effects: [
+                        { type: "airstrike", pos: [35.8, 36.8] }
+                    ]
+                },
+                {
+                    name: "ALEPPO",
+                    date: "Dec 2016",
+                    desc: "Syrian forces recapture Aleppo after brutal siege. Major turning point.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [36.15, 37.1], label: "Tiger Forces", size: "XX", movement: { to: [36.2, 37.16], speed: 2500 } },
+                        { type: "infantry", faction: "red", pos: [36.2, 37.16], label: "Rebels", size: "X", retreating: true }
+                    ],
+                    effects: [
+                        { type: "siege", pos: [36.2, 37.16] },
+                        { type: "urbanBattle", pos: [36.2, 37.16] }
+                    ]
+                },
+                {
+                    name: "ISIS DEFEAT",
+                    date: "2017-19",
+                    desc: "Coalition and SDF destroy ISIS. Raqqa liberated. Caliphate falls.",
+                    units: [
+                        { type: "infantry", faction: "blue", pos: [36.5, 40.0], label: "SDF", size: "XX", movement: { to: [35.95, 39.0], speed: 3000 } },
+                        { type: "armor", faction: "blue", pos: [34.5, 40.0], label: "SAA", size: "XX", movement: { to: [35.33, 40.15], speed: 3500 } }
+                    ],
+                    arrows: [
+                        { from: [36.5, 40.0], to: [35.95, 39.0], color: "#ffcc00", label: "SDF ADVANCE" },
+                        { from: [34.5, 40.0], to: [35.33, 40.15], color: "#00c8ff" }
+                    ],
+                    effects: [{ type: "liberation", pos: [35.95, 39.0] }]
+                },
+                {
+                    name: "CURRENT",
+                    date: "2024",
+                    desc: "Assad controls most of Syria. HTS holds Idlib. SDF controls northeast. Frozen conflict.",
+                    units: [
+                        { type: "flag", faction: "blue", pos: [33.5, 36.3], label: "ASSAD", size: "⚑" },
+                        { type: "flag", faction: "red", pos: [35.9, 36.6], label: "IDLIB", size: "⚑" },
+                        { type: "flag", faction: "blue", pos: [36.5, 40.0], label: "SDF", size: "⚑" }
+                    ],
+                    frontline: [[36.3, 36.3], [35.5, 36.8], [35.0, 37.5]]
+                }
+            ]
+        }
+    ],
+    "IRAQ": [
+        {
+            id: "gulf_war",
+            name: "Gulf War",
+            year: "1991",
+            region: "Iraq / Kuwait",
+            desc: "Coalition forces liberate Kuwait. 100-hour ground war showcases modern warfare.",
+            attacker: { name: "Iraq", equipment: "T-72, Scud missiles" },
+            defender: { name: "Coalition", equipment: "M1 Abrams, F-117, Tomahawk" },
+            center: [29.5, 47.0],
+            zoom: 6,
+            phases: [
+                {
+                    name: "INVASION",
+                    date: "Aug 2, 1990",
+                    desc: "Iraq invades Kuwait. 100,000 troops overwhelm defenders.",
+                    units: [
+                        { type: "armor", faction: "red", pos: [30.0, 47.8], label: "Rep Guard", size: "XXX", movement: { to: [29.3, 47.9], speed: 2000 } }
+                    ],
+                    arrows: [
+                        { from: [30.0, 47.8], to: [29.3, 47.9], color: "#ff3333", label: "INVASION" }
+                    ],
+                    effects: [{ type: "invasion", pos: [29.3, 47.9] }]
+                },
+                {
+                    name: "SHIELD",
+                    date: "Aug 90 - Jan 91",
+                    desc: "Coalition buildup. 700,000 troops assemble in Saudi Arabia.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [27.0, 47.0], label: "VII Corps", size: "XXX" },
+                        { type: "armor", faction: "blue", pos: [27.5, 48.0], label: "XVIII Corps", size: "XXX" },
+                        { type: "infantry", faction: "blue", pos: [26.5, 49.0], label: "Marines", size: "XXX" },
+                        { type: "armor", faction: "red", pos: [29.0, 47.5], label: "Iraqi Defense", size: "XXXX" }
+                    ],
+                    effects: [{ type: "buildup", pos: [27.0, 47.5] }]
+                },
+                {
+                    name: "AIR WAR",
+                    date: "Jan 17 - Feb 23",
+                    desc: "38-day air campaign. 100,000+ sorties devastate Iraqi military.",
+                    units: [
+                        { type: "air", faction: "blue", pos: [28.0, 48.5], label: "USAF", size: "★", movement: { to: [33.3, 44.4], speed: 2000 } },
+                        { type: "air", faction: "blue", pos: [27.0, 48.0], label: "F-117", size: "II", movement: { to: [33.3, 44.4], speed: 1800 } }
+                    ],
+                    arrows: [
+                        { from: [28.0, 48.5], to: [33.3, 44.4], color: "#00c8ff", label: "BAGHDAD" }
+                    ],
+                    effects: [
+                        { type: "airstrike", pos: [33.3, 44.4] }
+                    ]
+                },
+                {
+                    name: "LEFT HOOK",
+                    date: "Feb 24-28",
+                    desc: "100-hour ground war. Massive flanking maneuver destroys Republican Guard.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [28.0, 45.0], label: "VII Corps", size: "XXX", movement: { to: [30.5, 46.5], speed: 3500 } },
+                        { type: "armor", faction: "blue", pos: [28.5, 46.0], label: "XVIII Corps", size: "XXX", movement: { to: [30.0, 47.0], speed: 4000 } },
+                        { type: "infantry", faction: "blue", pos: [29.0, 47.5], label: "Marines", size: "XXX", movement: { to: [29.3, 47.9], speed: 3000 } },
+                        { type: "armor", faction: "red", pos: [30.0, 47.0], label: "Rep Guard", size: "XXX", destroyed: true }
+                    ],
+                    arrows: [
+                        { from: [28.0, 45.0], to: [30.5, 46.5], color: "#00c8ff", label: "LEFT HOOK" },
+                        { from: [29.0, 47.5], to: [29.3, 47.9], color: "#00c8ff", label: "KUWAIT CITY" }
+                    ],
+                    effects: [
+                        { type: "tankBattle", pos: [30.0, 46.5] },
+                        { type: "liberation", pos: [29.3, 47.9] }
+                    ]
+                },
+                {
+                    name: "VICTORY",
+                    date: "Feb 28",
+                    desc: "Kuwait liberated. Iraqi army destroyed. Ceasefire declared.",
+                    units: [
+                        { type: "flag", faction: "blue", pos: [29.3, 47.9], label: "KUWAIT FREE", size: "⚑" }
+                    ],
+                    effects: [{ type: "victory", pos: [29.3, 47.9] }]
+                }
+            ]
+        },
+        {
+            id: "isis_war",
+            name: "War Against ISIS",
+            year: "2014-2017",
+            region: "Iraq",
+            desc: "Campaign to destroy ISIS caliphate. Battle of Mosul largest urban combat since WWII.",
+            attacker: { name: "ISIS", equipment: "Captured T-55, VBIEDs" },
+            defender: { name: "Iraq / Coalition", equipment: "M1 Abrams, F-16, Apache" },
+            center: [35.0, 43.0],
+            zoom: 6,
+            phases: [
+                {
+                    name: "ISIS BLITZ",
+                    date: "June 2014",
+                    desc: "ISIS captures Mosul in days. Iraqi army collapses. Caliphate declared.",
+                    units: [
+                        { type: "infantry", faction: "red", pos: [36.0, 42.5], label: "ISIS", size: "XX", movement: { to: [36.3, 43.1], speed: 2000 } },
+                        { type: "armor", faction: "blue", pos: [36.3, 43.1], label: "Iraqi 2nd Div", size: "XX", destroyed: true }
+                    ],
+                    arrows: [
+                        { from: [36.0, 42.5], to: [36.3, 43.1], color: "#000000", label: "MOSUL FALLS" }
+                    ],
+                    effects: [
+                        { type: "collapse", pos: [36.3, 43.1] },
+                        { type: "terror", pos: [36.3, 43.1] }
+                    ]
+                },
+                {
+                    name: "TIKRIT",
+                    date: "Mar 2015",
+                    desc: "First major counteroffensive. Iraqi forces retake Tikrit.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [34.0, 43.5], label: "Iraqi Army", size: "XX", movement: { to: [34.6, 43.6], speed: 3000 } },
+                        { type: "infantry", faction: "red", pos: [34.6, 43.6], label: "ISIS", size: "II", retreating: true }
+                    ],
+                    arrows: [
+                        { from: [34.0, 43.5], to: [34.6, 43.6], color: "#00c8ff", label: "TIKRIT" }
+                    ],
+                    effects: [{ type: "urbanBattle", pos: [34.6, 43.6] }]
+                },
+                {
+                    name: "MOSUL",
+                    date: "Oct 2016 - Jul 2017",
+                    desc: "9-month battle for Mosul. Largest urban battle since Stalingrad.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [36.0, 43.0], label: "Iraqi 9th Div", size: "XX", movement: { to: [36.25, 43.1], speed: 3000 } },
+                        { type: "armor", faction: "blue", pos: [36.35, 43.3], label: "CTS", size: "XX", movement: { to: [36.3, 43.15], speed: 3500 } },
+                        { type: "infantry", faction: "red", pos: [36.3, 43.1], label: "ISIS Mosul", size: "X" }
+                    ],
+                    arrows: [
+                        { from: [36.0, 43.0], to: [36.25, 43.1], color: "#00c8ff", label: "MOSUL" }
+                    ],
+                    frontline: [[36.35, 43.0], [36.3, 43.1], [36.25, 43.15]],
+                    effects: [
+                        { type: "siege", pos: [36.3, 43.1] },
+                        { type: "urbanBattle", pos: [36.3, 43.12] }
+                    ]
+                },
+                {
+                    name: "VICTORY",
+                    date: "Jul 2017",
+                    desc: "Mosul liberated. Caliphate destroyed. ISIS territorially defeated.",
+                    units: [
+                        { type: "flag", faction: "blue", pos: [36.3, 43.1], label: "MOSUL FREE", size: "⚑" }
+                    ],
+                    effects: [
+                        { type: "victory", pos: [36.3, 43.1] },
+                        { type: "liberation", pos: [36.3, 43.1] }
+                    ]
+                }
+            ]
+        }
+    ],
+    "UKRAINE": [
+        {
+            id: "ukraine_2022",
+            name: "Russian Invasion",
+            year: "2022-Present",
+            region: "Ukraine",
+            desc: "Largest European war since WWII. Russia's invasion met with fierce Ukrainian resistance.",
+            attacker: { name: "Russia", equipment: "T-72B3, T-90M, Su-35, Kalibr" },
+            defender: { name: "Ukraine", equipment: "T-64BV, Bayraktar TB2, HIMARS, Leopard 2" },
+            center: [49.0, 32.0],
+            zoom: 6,
+            phases: [
+                {
+                    name: "INVASION",
+                    date: "Feb 24, 2022",
+                    desc: "Russia launches massive invasion from north, east, and south. Targets Kyiv.",
+                    units: [
+                        { type: "armor", faction: "red", pos: [52.0, 31.0], label: "Belarus Axis", size: "XXXX", movement: { to: [50.5, 30.5], speed: 3000 } },
+                        { type: "armor", faction: "red", pos: [50.0, 36.2], label: "Kharkiv Axis", size: "XXX", movement: { to: [49.5, 35.5], speed: 3000 } },
+                        { type: "armor", faction: "red", pos: [46.0, 33.5], label: "Crimea Axis", size: "XXX", movement: { to: [46.8, 34.5], speed: 3000 } },
+                        { type: "armor", faction: "blue", pos: [50.45, 30.5], label: "Kyiv Defense", size: "★" }
+                    ],
+                    arrows: [
+                        { from: [52.0, 31.0], to: [50.5, 30.5], color: "#ff3333", label: "KYIV AXIS" },
+                        { from: [50.0, 36.2], to: [49.5, 35.5], color: "#ff3333" },
+                        { from: [46.0, 33.5], to: [46.8, 34.5], color: "#ff3333" }
+                    ],
+                    effects: [
+                        { type: "invasion", pos: [50.5, 30.5] },
+                        { type: "battle", pos: [49.5, 35.5] }
+                    ]
+                },
+                {
+                    name: "KYIV",
+                    date: "Feb-Mar 2022",
+                    desc: "Russian forces reach Kyiv suburbs. VDV assault on Hostomel. Ukrainian resistance fierce.",
+                    units: [
+                        { type: "air", faction: "red", pos: [50.6, 30.2], label: "VDV", size: "X", movement: { to: [50.58, 30.26], speed: 1500 } },
+                        { type: "armor", faction: "red", pos: [50.9, 30.5], label: "Russian 35th", size: "XXX" },
+                        { type: "armor", faction: "blue", pos: [50.45, 30.5], label: "Kyiv TDF", size: "★" }
+                    ],
+                    frontline: [[51.5, 30.0], [50.8, 30.5], [50.3, 31.5]],
+                    effects: [
+                        { type: "urbanBattle", pos: [50.58, 30.26] },
+                        { type: "battle", pos: [50.6, 30.35] }
+                    ]
+                },
+                {
+                    name: "RETREAT",
+                    date: "Apr 2022",
+                    desc: "Russia withdraws from Kyiv after heavy losses. Bucha atrocities discovered.",
+                    units: [
+                        { type: "armor", faction: "red", pos: [50.8, 30.5], label: "Russian Forces", size: "XXX", retreating: true, movement: { to: [52.0, 31.0], speed: 2500 } },
+                        { type: "flag", faction: "blue", pos: [50.45, 30.5], label: "KYIV HOLDS", size: "⚑" }
+                    ],
+                    arrows: [
+                        { from: [50.8, 30.5], to: [52.0, 31.0], color: "#ff3333", label: "RETREAT" }
+                    ],
+                    effects: [
+                        { type: "retreat", pos: [51.0, 30.5] },
+                        { type: "victory", pos: [50.45, 30.5] }
+                    ]
+                },
+                {
+                    name: "KHARKIV",
+                    date: "Sep 2022",
+                    desc: "Ukraine launches lightning offensive. Liberates most of Kharkiv Oblast.",
+                    units: [
+                        { type: "armor", faction: "blue", pos: [49.5, 36.5], label: "Ukrainian Army", size: "XXX", movement: { to: [49.8, 37.5], speed: 2500 } },
+                        { type: "armor", faction: "red", pos: [49.3, 37.8], label: "Russian Forces", size: "XX", retreating: true }
+                    ],
+                    arrows: [
+                        { from: [49.5, 36.5], to: [49.8, 37.5], color: "#00c8ff", label: "KHARKIV OFFENSIVE" }
+                    ],
+                    effects: [{ type: "breakthrough", pos: [49.6, 37.0] }]
+                },
+                {
+                    name: "KHERSON",
+                    date: "Nov 2022",
+                    desc: "Russia withdraws from west Dnipro. Kherson city liberated.",
+                    units: [
+                        { type: "armor", faction: "red", pos: [46.65, 32.6], label: "Russian Forces", size: "XXX", retreating: true, movement: { to: [46.65, 33.5], speed: 3000 } },
+                        { type: "flag", faction: "blue", pos: [46.65, 32.6], label: "KHERSON FREE", size: "⚑" }
+                    ],
+                    effects: [{ type: "liberation", pos: [46.65, 32.6] }]
+                },
+                {
+                    name: "CURRENT",
+                    date: "2024",
+                    desc: "Attritional warfare continues. Russia holds ~18% of Ukraine. Front largely static.",
+                    units: [
+                        { type: "flag", faction: "red", pos: [48.5, 38.5], label: "OCCUPIED", size: "⚑" },
+                        { type: "flag", faction: "blue", pos: [50.45, 30.5], label: "UKRAINE", size: "⚑" }
+                    ],
+                    frontline: [[49.5, 37.0], [48.0, 38.0], [47.5, 37.5], [47.0, 36.5], [46.5, 35.0], [46.0, 34.0]]
+                }
+            ]
+        }
+    ],
+    "YEMEN": [
+        {
+            id: "yemen_war",
+            name: "Yemen War",
+            year: "2014-Present",
+            region: "Yemen",
+            desc: "Houthis vs Saudi-backed government. World's worst humanitarian crisis.",
+            attacker: { name: "Houthis (Ansar Allah)", equipment: "T-55, Ballistic Missiles, Drones" },
+            defender: { name: "Saudi Coalition", equipment: "F-15, M1 Abrams, Patriot" },
+            center: [15.0, 48.0],
+            zoom: 6,
+            phases: [
+                {
+                    name: "TAKEOVER",
+                    date: "Sep 2014",
+                    desc: "Houthis seize Sanaa. President flees to Aden.",
+                    units: [
+                        { type: "infantry", faction: "red", pos: [15.35, 44.2], label: "Houthis", size: "XXX", movement: { to: [14.5, 44.5], speed: 2500 } },
+                        { type: "infantry", faction: "blue", pos: [12.8, 45.0], label: "Govt Forces", size: "XX" }
+                    ],
+                    arrows: [
+                        { from: [15.35, 44.2], to: [14.5, 44.5], color: "#ff3333" }
+                    ]
+                },
+                {
+                    name: "INTERVENTION",
+                    date: "Mar 2015",
+                    desc: "Saudi-led coalition begins massive air campaign.",
+                    units: [
+                        { type: "air", faction: "blue", pos: [20.0, 45.0], label: "RSAF", size: "★", movement: { to: [15.35, 44.2], speed: 2000 } },
+                        { type: "infantry", faction: "red", pos: [15.35, 44.2], label: "Houthis", size: "XXX" }
+                    ],
+                    arrows: [
+                        { from: [20.0, 45.0], to: [15.35, 44.2], color: "#00c8ff", label: "AIR CAMPAIGN" }
+                    ],
+                    effects: [{ type: "airstrike", pos: [15.35, 44.2] }]
+                },
+                {
+                    name: "STALEMATE",
+                    date: "2016-22",
+                    desc: "Front lines freeze. Humanitarian catastrophe deepens.",
+                    units: [
+                        { type: "flag", faction: "red", pos: [15.35, 44.2], label: "HOUTHI", size: "⚑" },
+                        { type: "flag", faction: "blue", pos: [13.5, 46.0], label: "GOVT", size: "⚑" }
+                    ],
+                    frontline: [[15.5, 43.5], [14.5, 44.5], [14.0, 46.0], [13.5, 48.0]]
+                },
+                {
+                    name: "RED SEA",
+                    date: "2023-24",
+                    desc: "Houthis attack Red Sea shipping over Gaza war.",
+                    units: [
+                        { type: "infantry", faction: "red", pos: [14.8, 42.9], label: "Houthi Missiles", size: "II", movement: { to: [13.5, 42.5], speed: 2000 } },
+                        { type: "armor", faction: "blue", pos: [13.0, 43.0], label: "US Navy", size: "★" }
+                    ],
+                    arrows: [
+                        { from: [14.8, 42.9], to: [13.5, 42.5], color: "#ff3333", label: "MISSILES" },
+                        { from: [13.0, 43.0], to: [14.8, 42.9], color: "#00c8ff", label: "STRIKES" }
+                    ],
+                    effects: [
+                        { type: "missile", pos: [13.5, 42.5] },
+                        { type: "airstrike", pos: [14.8, 42.9] }
+                    ]
+                }
+            ]
+        }
+    ]
+};
+
+// =====================================================
+// MAP ENGINE
+// =====================================================
+let map;
+let currentConflict = null;
+let currentPhaseIndex = 0;
+let unitLayer = L.layerGroup();
+let arrowLayer = L.layerGroup();
+let effectsLayer = L.layerGroup();
+let frontlineLayer = L.layerGroup();
+let animationInterval;
+let isPlaying = false;
+
+function initMap() {
+    map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false
+    }).setView([32.0, 38.0], 5);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18
+    }).addTo(map);
+
+    unitLayer.addTo(map);
+    arrowLayer.addTo(map);
+    effectsLayer.addTo(map);
+    frontlineLayer.addTo(map);
+    
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+}
+
+// =====================================================
+// UNIT RENDERING
+// =====================================================
+function createUnitMarker(unit) {
+    const isRed = unit.faction === 'red';
+    const colorClass = isRed ? 'faction-red' : 'faction-blue';
+    
+    let symbol = '●';
+    if (unit.type === 'armor') symbol = '▣';
+    else if (unit.type === 'infantry') symbol = '☒';
+    else if (unit.type === 'air') symbol = '▲';
+    else if (unit.type === 'flag') symbol = unit.size || '⚑';
+
+    const statusClass = unit.destroyed ? 'destroyed' : 
+                       (unit.retreating ? 'retreating' : 
+                       (unit.encircled ? 'encircled' : 
+                       (unit.highlight ? 'highlight' : '')));
+
+    const html = `
+        <div class="unit-container ${statusClass}">
+            <div class="nato-symbol ${colorClass}">
+                <span>${symbol}</span>
+            </div>
+            ${unit.size && unit.type !== 'flag' ? `<div class="unit-size">${unit.size}</div>` : ''}
+            ${unit.label ? `<div class="unit-label">${unit.label}</div>` : ''}
+        </div>
+    `;
+
+    const icon = L.divIcon({
+        className: 'animated-unit',
+        html: html,
+        iconSize: [60, 50],
+        iconAnchor: [30, 25]
+    });
+
+    return L.marker(unit.pos, { icon: icon });
+}
+
+function animateUnit(marker, movement) {
+    if (!movement) return;
+    
+    const start = marker.getLatLng();
+    const end = L.latLng(movement.to);
+    const duration = movement.speed || 2000;
+    const startTime = Date.now();
+
+    function animate() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        
+        const lat = start.lat + (end.lat - start.lat) * eased;
+        const lng = start.lng + (end.lng - start.lng) * eased;
+        
+        marker.setLatLng([lat, lng]);
+
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        }
+    }
+    requestAnimationFrame(animate);
+}
+
+// =====================================================
+// ARROW RENDERING
+// =====================================================
+function createArrow(arrow) {
+    const line = L.polyline([arrow.from, arrow.to], {
+        color: arrow.color || '#00c8ff',
+        weight: 4,
+        opacity: 0.8,
+        dashArray: '12, 6'
+    });
+
+    // Animate dash
+    let offset = 0;
+    const animateDash = () => {
+        offset = (offset - 1) % 18;
+        line.setStyle({ dashOffset: offset });
+        requestAnimationFrame(animateDash);
+    };
+    requestAnimationFrame(animateDash);
+
+    arrowLayer.addLayer(line);
+
+    // Arrow head
+    try {
+        const decorator = L.polylineDecorator(line, {
+            patterns: [{
+                offset: '100%',
+                repeat: 0,
+                symbol: L.Symbol.arrowHead({
+                    pixelSize: 12,
+                    polygon: false,
+                    pathOptions: { stroke: true, color: arrow.color || '#00c8ff', weight: 3 }
+                })
+            }]
+        });
+        arrowLayer.addLayer(decorator);
+    } catch(e) {}
+
+    // Label
+    if (arrow.label) {
+        const mid = [(arrow.from[0] + arrow.to[0]) / 2, (arrow.from[1] + arrow.to[1]) / 2];
+        const labelMarker = L.marker(mid, {
+            icon: L.divIcon({
+                className: '',
+                html: `<div class="arrow-label-text">${arrow.label}</div>`,
+                iconSize: [100, 20],
+                iconAnchor: [50, 10]
+            })
+        });
+        arrowLayer.addLayer(labelMarker);
+    }
+}
+
+// =====================================================
+// FRONTLINE RENDERING
+// =====================================================
+function createFrontline(points) {
+    const line = L.polyline(points, {
+        color: '#ffcc00',
+        weight: 3,
+        opacity: 0.7,
+        dashArray: '8, 8'
+    });
+
+    let offset = 0;
+    const animate = () => {
+        offset = (offset - 0.5) % 16;
+        line.setStyle({ dashOffset: offset });
+        requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+
+    frontlineLayer.addLayer(line);
+}
+
+// =====================================================
+// EFFECTS
+// =====================================================
+function createEffect(effect) {
+    const pos = effect.pos;
+    const delay = effect.delay || 0;
+
+    setTimeout(() => {
+        switch(effect.type) {
+            case 'explosion':
+            case 'airstrike':
+                createExplosion(pos);
+                break;
+            case 'battle':
+            case 'urbanBattle':
+            case 'epicBattle':
+                createBattle(pos, effect.type === 'epicBattle');
+                break;
+            case 'victory':
+            case 'liberation':
+                createVictory(pos);
+                break;
+            case 'crossing':
+            case 'encirclement':
+                createRing(pos, effect.type === 'encirclement' ? '#ff3333' : '#00c8ff');
+                break;
+            case 'dust':
+                createDust(pos);
+                break;
+            case 'rockets':
+            case 'missile':
+                createRockets(pos);
+                break;
+        }
+    }, delay);
+}
+
+function createExplosion(pos) {
+    for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+            const circle = L.circleMarker(pos, {
+                radius: 5,
+                color: '#ff6600',
+                fillColor: '#ffcc00',
+                fillOpacity: 0.8,
+                weight: 2
+            });
+            effectsLayer.addLayer(circle);
+
+            let radius = 5;
+            const expand = () => {
+                radius += 2;
+                const opacity = Math.max(0, 0.8 - radius / 50);
+                circle.setRadius(radius);
+                circle.setStyle({ fillOpacity: opacity, opacity: opacity });
+                
+                if (radius < 50) {
+                    requestAnimationFrame(expand);
+                } else {
+                    effectsLayer.removeLayer(circle);
+                }
+            };
+            requestAnimationFrame(expand);
+        }, i * 150);
+    }
+}
+
+function createBattle(pos, epic) {
+    const count = epic ? 15 : 8;
+    for (let i = 0; i < count; i++) {
+        setTimeout(() => {
+            const offset = [pos[0] + (Math.random() - 0.5) * 0.05, pos[1] + (Math.random() - 0.5) * 0.05];
+            const color = Math.random() > 0.5 ? '#ff3333' : '#00c8ff';
+            
+            const flash = L.circleMarker(offset, {
+                radius: 3 + Math.random() * 5,
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.9
+            });
+            effectsLayer.addLayer(flash);
+
+            setTimeout(() => effectsLayer.removeLayer(flash), 300 + Math.random() * 400);
+        }, i * 150);
+    }
+}
+
+function createVictory(pos) {
+    const star = L.marker(pos, {
+        icon: L.divIcon({
+            className: '',
+            html: '<div class="victory-star">★</div>',
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+        })
+    });
+    effectsLayer.addLayer(star);
+}
+
+function createRing(pos, color) {
+    const ring = L.circle(pos, {
+        radius: 15000,
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.1,
+        weight: 2,
+        dashArray: '8, 8'
+    });
+    effectsLayer.addLayer(ring);
+
+    let offset = 0;
+    const animate = () => {
+        offset = (offset + 1) % 16;
+        ring.setStyle({ dashOffset: offset });
+        requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+}
+
+function createDust(pos) {
+    for (let i = 0; i < 6; i++) {
+        const offset = [pos[0] + (Math.random() - 0.5) * 0.1, pos[1] + (Math.random() - 0.5) * 0.1];
+        const dust = L.circleMarker(offset, {
+            radius: 8 + Math.random() * 12,
+            color: '#c4a45f',
+            fillColor: '#d4b46f',
+            fillOpacity: 0.3,
+            weight: 0
+        });
+        effectsLayer.addLayer(dust);
+        setTimeout(() => effectsLayer.removeLayer(dust), 3000);
+    }
+}
+
+function createRockets(pos) {
+    for (let i = 0; i < 5; i++) {
+        setTimeout(() => {
+            createExplosion([pos[0] + (Math.random() - 0.5) * 0.05, pos[1] + (Math.random() - 0.5) * 0.05]);
+        }, i * 200);
+    }
+}
+
+// =====================================================
+// PHASE RENDERING
+// =====================================================
+function renderPhase(phase) {
+    unitLayer.clearLayers();
+    arrowLayer.clearLayers();
+    effectsLayer.clearLayers();
+    frontlineLayer.clearLayers();
+
+    // Frontlines first
+    if (phase.frontline) {
+        createFrontline(phase.frontline);
+    }
+
+    // Arrows
+    if (phase.arrows) {
+        phase.arrows.forEach((arrow, i) => {
+            setTimeout(() => createArrow(arrow), i * 200);
+        });
+    }
+
+    // Units
+    if (phase.units) {
+        phase.units.forEach((unit, i) => {
+            setTimeout(() => {
+                const marker = createUnitMarker(unit);
+                unitLayer.addLayer(marker);
+
+                // Entrance animation
+                const el = marker.getElement();
+                if (el) {
+                    el.style.opacity = '0';
+                    el.style.transform = 'scale(0.3)';
+                    setTimeout(() => {
+                        el.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                        el.style.opacity = '1';
+                        el.style.transform = 'scale(1)';
+                    }, 50);
+                }
+
+                // Movement
+                if (unit.movement) {
+                    setTimeout(() => animateUnit(marker, unit.movement), 800);
+                }
+            }, i * 150);
+        });
+    }
+
+    // Effects
+    if (phase.effects) {
+        phase.effects.forEach(effect => createEffect(effect));
+    }
+}
+
+// =====================================================
+// UI
+// =====================================================
+function renderSidebar() {
+    const list = document.getElementById('conflict-list');
+    list.innerHTML = '';
+
+    for (const [country, items] of Object.entries(conflicts)) {
+        const group = document.createElement('div');
+        group.className = 'country-group';
+        
+        const header = document.createElement('div');
+        header.className = 'country-header';
+        header.innerHTML = `<span>${country}</span><span style="color:#ffaa00">${items.length}</span>`;
+        group.appendChild(header);
+
+        items.forEach(c => {
+            const item = document.createElement('div');
+            item.className = 'conflict-item';
+            item.innerHTML = `<span class="conflict-year">${c.year}</span> ${c.name}`;
+            item.onclick = () => loadConflict(c);
+            group.appendChild(item);
+        });
+
+        list.appendChild(group);
+    }
+}
+
+function loadConflict(conflict) {
+    document.querySelectorAll('.conflict-item').forEach(i => i.classList.remove('active'));
+    if (event && event.target) event.target.classList.add('active');
+
+    currentConflict = conflict;
+    currentPhaseIndex = 0;
+    isPlaying = false;
+    document.getElementById('play-btn').innerHTML = '▶';
+
+    document.getElementById('mission-info').style.display = 'block';
+    document.getElementById('m-title').textContent = conflict.name.toUpperCase();
+    document.getElementById('m-meta').textContent = `${conflict.year} // ${conflict.region.toUpperCase()}`;
+    document.getElementById('m-desc').textContent = conflict.desc;
+    
+    if (conflict.attacker) {
+        document.getElementById('m-attacker').innerHTML = `
+            <div style="color:#ff6666">${conflict.attacker.name}</div>
+            <div style="color:#555; font-size:8px">${conflict.attacker.equipment}</div>
+        `;
+    }
+    if (conflict.defender) {
+        document.getElementById('m-defender').innerHTML = `
+            <div style="color:#66ccff">${conflict.defender.name}</div>
+            <div style="color:#555; font-size:8px">${conflict.defender.equipment}</div>
+        `;
+    }
+
+    if (conflict.center) {
+        map.flyTo(conflict.center, conflict.zoom || 7, { duration: 1.5 });
+    }
+
+    const timeline = document.getElementById('timeline-controls');
+    const phaseBtns = document.getElementById('phase-buttons');
+    phaseBtns.innerHTML = '';
+
+    if (conflict.phases && conflict.phases.length > 0) {
+        timeline.style.display = 'flex';
+        conflict.phases.forEach((p, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'phase-btn';
+            btn.textContent = p.name;
+            btn.onclick = () => goToPhase(i);
+            phaseBtns.appendChild(btn);
+        });
+        
+        setTimeout(() => goToPhase(0), 1500);
+    } else {
+        timeline.style.display = 'none';
+        unitLayer.clearLayers();
+        arrowLayer.clearLayers();
+        effectsLayer.clearLayers();
+        frontlineLayer.clearLayers();
+    }
+}
+
+function goToPhase(index) {
+    if (!currentConflict || !currentConflict.phases) return;
+    currentPhaseIndex = index;
+
+    document.querySelectorAll('.phase-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', i === index);
+    });
+
+    document.getElementById('phase-counter').textContent = `${index + 1}/${currentConflict.phases.length}`;
+
+    const phase = currentConflict.phases[index];
+    
+    document.getElementById('m-desc').innerHTML = `
+        ${phase.date ? `<div style="color:#ffaa00; font-size:9px; margin-bottom:5px">${phase.date}</div>` : ''}
+        <strong style="color:#fff">${phase.name}</strong><br>
+        <span style="color:#aaa">${phase.desc}</span>
+    `;
+
+    renderPhase(phase);
+}
+
+function playAnimation() {
+    if (!currentConflict || !currentConflict.phases) return;
+    
+    if (isPlaying) {
+        isPlaying = false;
+        if (animationInterval) clearInterval(animationInterval);
+        document.getElementById('play-btn').innerHTML = '▶';
+        return;
+    }
+
+    isPlaying = true;
+    document.getElementById('play-btn').innerHTML = '⏸';
+    
+    let i = currentPhaseIndex;
+    
+    animationInterval = setInterval(() => {
+        i++;
+        if (i < currentConflict.phases.length) {
+            goToPhase(i);
+        } else {
+            isPlaying = false;
+            clearInterval(animationInterval);
+            document.getElementById('play-btn').innerHTML = '▶';
+        }
+    }, 4000);
+}
+
+function closeModule() {
+    if (window.parent !== window) {
+        window.parent.postMessage({ type: 'CLOSE_MODULE' }, '*');
+    } else {
+        window.history.back();
+    }
+}
+
+// =====================================================
+// INIT
+// =====================================================
+async function init() {
+    initMap();
+    
+    // Load custom conflicts
+    if (window.ATLAS_API) {
+        try {
+            const saved = await ATLAS_API.getCustom('my-conflicts');
+            if (saved) conflicts = saved;
+        } catch(e) { console.log('No custom data'); }
+    }
+
+    renderSidebar();
+
+    const params = new URLSearchParams(window.location.search);
+    const countryParam = params.get('country');
+    if (countryParam) {
+        const key = Object.keys(conflicts).find(k => k.toLowerCase().includes(countryParam.toLowerCase()));
+        if (key && conflicts[key].length > 0) {
+            setTimeout(() => loadConflict(conflicts[key][0]), 1000);
+        }
+    }
+}
+
+window.saveChanges = async function() {
+    if (window.ATLAS_API) {
+        await ATLAS_API.saveCustom('my-conflicts', conflicts);
+        alert('Data saved!');
+    }
+};
+
+init();
+    </script>
+</body>
+</html>

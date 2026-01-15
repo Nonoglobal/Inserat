@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATLAS - Secure Access</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background: #000;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at center, 
+                rgba(255, 170, 0, 0.03) 0%, 
+                rgba(0, 0, 0, 0) 70%);
+            transform: translate(-50%, -50%);
+            animation: pulse 8s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+        }
+
+        /* Grid Lines */
+        .grid-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(255, 170, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 170, 0, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 1;
+            animation: gridMove 20s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        /* Scanline Effect */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.1) 0px,
+                rgba(0, 0, 0, 0.1) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* Login Container */
+        .login-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 450px;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: rgba(10, 10, 10, 0.95);
+            border: 1px solid #222;
+            padding: 50px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #ffaa00, transparent);
+            animation: scanTop 3s linear infinite;
+        }
+
+        @keyframes scanTop {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Corner Decorations */
+        .corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-color: #ffaa00;
+            border-style: solid;
+        }
+
+        .corner-tl { top: 10px; left: 10px; border-width: 2px 0 0 2px; }
+        .corner-tr { top: 10px; right: 10px; border-width: 2px 2px 0 0; }
+        .corner-bl { bottom: 10px; left: 10px; border-width: 0 0 2px 2px; }
+        .corner-br { bottom: 10px; right: 10px; border-width: 0 2px 2px 0; }
+
+        /* Logo */
+        .logo {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-text {
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: 15px;
+            color: #ffaa00;
+            text-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+            animation: logoGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes logoGlow {
+            0%, 100% { text-shadow: 0 0 20px rgba(255, 170, 0, 0.5); }
+            50% { text-shadow: 0 0 40px rgba(255, 170, 0, 0.8), 0 0 60px rgba(255, 170, 0, 0.4); }
+        }
+
+        .logo-subtitle {
+            font-size: 10px;
+            letter-spacing: 8px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 9px;
+            letter-spacing: 3px;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 15px;
+            color: #444;
+            font-size: 14px;
+            z-index: 1;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 15px 15px 15px 45px;
+            background: #111;
+            border: 1px solid #333;
+            color: #fff;
+            font-family: inherit;
+            font-size: 14px;
+            letter-spacing: 2px;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: #ffaa00;
+            box-shadow: 0 0 10px rgba(255, 170, 0, 0.2);
+        }
+
+        .form-input::placeholder {
+            color: #444;
+            letter-spacing: 1px;
+        }
+
+        /* Password Display - Shows dots */
+        .password-display {
+            width: 100%;
+            padding: 15px 15px 15px 45px;
+            background: #111;
+            border: 1px solid #333;
+            color: #ffaa00;
+            font-family: inherit;
+            font-size: 14px;
+            letter-spacing: 0px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            cursor: text;
+            transition: all 0.3s;
+        }
+
+        .password-display:focus-within,
+        .password-display.active {
+            border-color: #ffaa00;
+            box-shadow: 0 0 10px rgba(255, 170, 0, 0.2);
+        }
+
+        .password-display .dots {
+            color: #ffaa00;
+            font-size: 8px;
+            letter-spacing: 1px;
+        }
+
+        .password-display .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 18px;
+            background: #ffaa00;
+            margin-left: 2px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* Hidden real input */
+        .hidden-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            cursor: text;
+        }
+
+        /* Submit Button */
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: transparent;
+            border: 1px solid #ffaa00;
+            color: #ffaa00;
+            font-family: inherit;
+            font-size: 12px;
+            letter-spacing: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .submit-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 170, 0, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .submit-btn:hover::before {
+            left: 100%;
+        }
+
+        .submit-btn:hover {
+            background: #ffaa00;
+            color: #000;
+            box-shadow: 0 0 30px rgba(255, 170, 0, 0.5);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Error Message */
+        .error-msg {
+            background: rgba(255, 50, 50, 0.1);
+            border: 1px solid #ff3333;
+            color: #ff3333;
+            padding: 12px;
+            font-size: 10px;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
+            animation: shake 0.5s;
+        }
+
+        .error-msg.show {
+            display: block;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* Reboot Animation */
+        .reboot-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 2000;
+            display: none;
+            padding: 40px;
+            font-family: 'Courier New', monospace;
+            color: #00ff00;
+            font-size: 14px;
+            line-height: 1.5;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        .reboot-overlay.active {
+            display: flex;
+        }
+
+        .terminal-line {
+            margin-bottom: 5px;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 18px;
+            background: #00ff00;
+            animation: blink 0.8s infinite;
+            vertical-align: text-bottom;
+        }
+
+        /* Security Badge */
+        .security-badge {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #222;
+        }
+
+        .security-badge span {
+            font-size: 8px;
+            letter-spacing: 3px;
+            color: #444;
+        }
+
+        /* Floating Particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #ffaa00;
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: float 10s infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.3; }
+            90% { opacity: 0.3; }
+            100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Effects -->
+    <div class="bg-animation"></div>
+    <div class="grid-overlay"></div>
+    <div class="scanlines"></div>
+    
+    <!-- Particles -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Login Container -->
+    <div class="login-container">
+        <div class="login-box">
+            <!-- Corner Decorations -->
+            <div class="corner corner-tl"></div>
+            <div class="corner corner-tr"></div>
+            <div class="corner corner-bl"></div>
+            <div class="corner corner-br"></div>
+
+            <!-- Logo -->
+            <div class="logo">
+                <div class="logo-text">ATLAS</div>
+                <div class="logo-subtitle">GEOPOLITICAL INTELLIGENCE SYSTEM</div>
+            </div>
+
+            <!-- Error Message -->
+            <div class="error-msg" id="error-msg">
+                ⚠ ACCESS DENIED - INVALID CREDENTIALS
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" onsubmit="return handleLogin(event)">
+                <!-- Username -->
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">◈</span>
+                        <input 
+                            type="text" 
+                            class="form-input" 
+                            id="username" 
+                            placeholder="Enter username"
+                            autocomplete="off"
+                            spellcheck="false"
+                        >
+                    </div>
+                </div>
+
+                <!-- Password with Triple Dots -->
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">◈</span>
+                        <div class="password-display" id="password-display" onclick="focusPassword()">
+                            <span class="dots" id="dots"></span>
+                            <span class="cursor" id="cursor"></span>
+                        </div>
+                        <input 
+                            type="text" 
+                            class="hidden-input" 
+                            id="password" 
+                            autocomplete="off"
+                            spellcheck="false"
+                            oninput="updatePasswordDisplay()"
+                            onfocus="setPasswordActive(true)"
+                            onblur="setPasswordActive(false)"
+                        >
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <button type="submit" class="submit-btn" id="submit-btn">
+                    Authorize Access
+                </button>
+            </form>
+
+            <!-- Security Badge -->
+            <div class="security-badge">
+                <span>🔒 ENCRYPTED CONNECTION • LEVEL 5 CLEARANCE REQUIRED</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reboot Overlay -->
+    <div class="reboot-overlay" id="reboot-overlay">
+        <div id="terminal-output"></div>
+        <div class="cursor"></div>
+    </div>
+
+    <script src="http://localhost:3001/atlas-api.js"></script>
+    <script>
+        // =====================================================
+        // ATLAS LOGIN SYSTEM
+        // =====================================================
+
+        // Password state
+        let realPassword = '';
+
+        // Create floating particles
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 10 + 's';
+                particle.style.animationDuration = (8 + Math.random() * 6) + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // Focus on password field
+        function focusPassword() {
+            document.getElementById('password').focus();
+        }
+
+        // Set password display active state
+        function setPasswordActive(active) {
+            const display = document.getElementById('password-display');
+            const cursor = document.getElementById('cursor');
+            
+            if (active) {
+                display.classList.add('active');
+                cursor.style.display = 'inline-block';
+            } else {
+                display.classList.remove('active');
+                cursor.style.display = 'none';
+            }
+        }
+
+        // Update password display with 3 dots per character
+        function updatePasswordDisplay() {
+            const input = document.getElementById('password');
+            const dotsSpan = document.getElementById('dots');
+            
+            realPassword = input.value;
+            
+            // Generate 3 dots (●) for each character
+            const dots = '●●●'.repeat(realPassword.length);
+            dotsSpan.textContent = dots;
+            
+            // Clear the visible input and store real value
+            input.value = realPassword;
+        }
+
+        // Handle login
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = realPassword;
+            const errorMsg = document.getElementById('error-msg');
+            const submitBtn = document.getElementById('submit-btn');
+
+            // Hide previous error
+            errorMsg.classList.remove('show');
+
+            // Disable button during check
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'VERIFYING...';
+
+            try {
+                await ATLAS_API.login(username, password);
+                // SUCCESS
+                showSuccess();
+            } catch (error) {
+                // FAILED
+                errorMsg.textContent = `⚠ ${(error.data?.message || error.message || 'ACCESS DENIED')}`.toUpperCase();
+                errorMsg.classList.add('show');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Authorize Access';
+                
+                // Shake the login box
+                document.querySelector('.login-box').style.animation = 'shake 0.5s';
+                setTimeout(() => {
+                    document.querySelector('.login-box').style.animation = '';
+                }, 500);
+            }
+
+            return false;
+        }
+
+        // Show success and redirect
+        function showSuccess() {
+            // Hide login UI
+            document.querySelector('.login-container').style.display = 'none';
+            
+            const overlay = document.getElementById('reboot-overlay');
+            overlay.classList.add('active');
+            const output = document.getElementById('terminal-output');
+
+            // Store login state
+            // The API client now stores the token in localStorage.
+            // We keep this sessionStorage item for simple checks on other pages.
+            sessionStorage.setItem('atlas_authenticated', 'true');
+            const user = JSON.parse(localStorage.getItem('atlas_user'));
+            sessionStorage.setItem('atlas_user', user ? user.username : 'USER');
+
+            const lines = [
+                "AUTHENTICATION VERIFIED.",
+                "INITIATING SYSTEM REBOOT...",
+                "STOPPING SERVICES [OK]",
+                "UNMOUNTING SECURITY MODULES [OK]",
+                "SYSTEM HALTED.",
+                " ",
+                "ATLAS BIOS v4.2.0 - (C) 2025 ATLAS CORP",
+                "CHECKING MEMORY... 64GB OK",
+                "LOADING KERNEL... OK",
+                "MOUNTING FILESYSTEMS... OK",
+                "STARTING ATLAS CORE SERVICES...",
+                "CONNECTING TO SATELLITE UPLINK... ESTABLISHED",
+                "DECRYPTING USER PROFILE... DONE",
+                " ",
+                `WELCOME COMMANDER ${(user ? user.username.toUpperCase() : 'USER')}.`,
+                "LAUNCHING INTERFACE..."
+            ];
+
+            let i = 0;
+            function printLine() {
+                if (i < lines.length) {
+                    const div = document.createElement('div');
+                    div.className = 'terminal-line';
+                    div.textContent = lines[i];
+                    output.appendChild(div);
+                    i++;
+                    setTimeout(printLine, Math.random() * 200 + 50);
+                } else {
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 1000);
+                }
+            }
+            
+            printLine();
+        }
+
+        // Check if already authenticated
+        (function checkAuth() {
+            // The API client constructor reads from localStorage, so this works on load.
+            if (ATLAS_API.isLoggedIn()) {
+                window.location.href = 'index.html';
+            }
+        })();
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            createParticles();
+            
+            // Focus username on load
+            setTimeout(() => {
+                document.getElementById('username').focus();
+            }, 500);
+        });
+
+        // Handle keyboard navigation
+        document.getElementById('username').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('password').focus();
+            }
+        });
+    </script>
+</body>
+</html>

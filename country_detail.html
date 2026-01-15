@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATLAS - Tactical View</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background: #000000;
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        /* ==========================================
+           MAP CONTAINER
+           ========================================== */
+        #map-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* ==========================================
+           CANVAS OVERLAY
+           ========================================== */
+        #canvas-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        /* ==========================================
+           COUNTRY NAME
+           ========================================== */
+        .country-name-overlay {
+            position: fixed;
+            right: 50px;
+            top: 50%;
+            transform: translateY(-50%);
+            text-align: right;
+            z-index: 200;
+            pointer-events: none;
+        }
+        
+        .country-name-main {
+            font-size: 52px;
+            font-weight: 700;
+            letter-spacing: 10px;
+            color: rgba(255, 255, 255, 0.12);
+            text-transform: uppercase;
+            line-height: 1.0;
+        }
+        
+        .country-name-sub {
+            font-size: 12px;
+            font-weight: 400;
+            letter-spacing: 6px;
+            color: rgba(255, 255, 255, 0.08);
+            margin-top: 15px;
+        }
+        
+        /* ==========================================
+           COORDINATE LABELS
+           ========================================== */
+        .coord-label {
+            position: fixed;
+            font-size: 8px;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.35);
+            pointer-events: none;
+            z-index: 150;
+        }
+        
+        .coord-label::before {
+            content: '□ ';
+            color: rgba(255, 255, 255, 0.25);
+        }
+        
+        .coord-label.cyan::before {
+            color: rgba(0, 200, 255, 0.4);
+        }
+        
+        .coord-label.cyan {
+            color: rgba(0, 200, 255, 0.5);
+        }
+        
+        /* ==========================================
+           TOP LEFT UI
+           ========================================== */
+        .ui-top-left {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            z-index: 200;
+        }
+        
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        
+        .status-dot {
+            width: 5px;
+            height: 5px;
+            background: #ff3333;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-dot.cyan {
+            background: #00c8ff;
+        }
+        
+        .status-dot.green {
+            background: #00ff00;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+        
+        .status-text {
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: #555;
+        }
+        
+        .zone-box {
+            margin-top: 20px;
+            padding: 10px;
+            border-left: 2px solid #ff3333;
+            background: rgba(255, 50, 50, 0.05);
+        }
+        
+        .zone-text {
+            font-size: 7px;
+            letter-spacing: 1px;
+            color: #444;
+            line-height: 1.6;
+        }
+        
+        .zone-text span {
+            color: #ff3333;
+        }
+        
+        /* ==========================================
+           BOTTOM INFO
+           ========================================== */
+        .ui-bottom {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 200;
+        }
+        
+        .info-text {
+            font-size: 10px;
+            letter-spacing: 3px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .info-sub {
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: #333;
+            margin-top: 5px;
+        }
+        
+        /* ==========================================
+           CLOSE BUTTON
+           ========================================== */
+        #close-btn {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            width: 32px;
+            height: 32px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #333;
+            color: #555;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 300;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        
+        #close-btn:hover {
+            border-color: #fff;
+            color: #fff;
+        }
+        
+        /* ==========================================
+           VIGNETTE
+           ========================================== */
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at center, transparent 20%, rgba(0,0,0,0.85) 100%);
+            pointer-events: none;
+            z-index: 50;
+        }
+        
+        /* ==========================================
+           SCAN LINE
+           ========================================== */
+        .scan-line {
+            position: fixed;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(0, 200, 255, 0.1) 20%, 
+                rgba(0, 200, 255, 0.3) 50%, 
+                rgba(0, 200, 255, 0.1) 80%, 
+                transparent 100%);
+            z-index: 60;
+            pointer-events: none;
+            animation: scanMove 6s linear infinite;
+        }
+        
+        @keyframes scanMove {
+            0% { top: 5%; opacity: 0; }
+            5% { opacity: 1; }
+            95% { opacity: 1; }
+            100% { top: 95%; opacity: 0; }
+        }
+        
+        /* ==========================================
+           NEWS PANEL - IMPROVED
+           ========================================== */
+        #news-panel {
+            position: absolute;
+            bottom: 80px;
+            left: 25px;
+            width: 380px;
+            max-height: 450px;
+            background: rgba(5, 5, 5, 0.95);
+            border: 1px solid #1a1a1a;
+            z-index: 250;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+        }
+        
+        #news-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(180deg, #00c8ff 0%, #ff3333 100%);
+        }
+        
+        #news-panel-header {
+            padding: 15px 18px;
+            background: rgba(0, 200, 255, 0.03);
+            border-bottom: 1px solid #1a1a1a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #news-panel-title {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #00c8ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #news-panel-title::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: #00c8ff;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .news-count {
+            font-size: 9px;
+            font-weight: 400;
+            color: #444;
+            margin-left: 10px;
+        }
+        
+        #news-panel-toggle {
+            background: none;
+            border: 1px solid #333;
+            color: #555;
+            width: 24px;
+            height: 24px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #news-panel-toggle:hover {
+            border-color: #00c8ff;
+            color: #00c8ff;
+        }
+        
+        #news-panel-content {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 380px;
+        }
+        
+        #news-panel-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        #news-panel-content::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        
+        #news-panel-content::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 2px;
+        }
+        
+        #news-panel-content::-webkit-scrollbar-thumb:hover {
+            background: #00c8ff;
+        }
+        
+        /* News Item - Improved */
+        .news-item {
+            padding: 15px 18px;
+            border-bottom: 1px solid #111;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .news-item:hover {
+            background: rgba(0, 200, 255, 0.03);
+        }
+        
+        .news-item:hover::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #00c8ff;
+        }
+        
+        .news-item:last-child {
+            border-bottom: none;
+        }
+        
+        .news-item-header {
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+        
+        .news-item-image {
+            width: 60px;
+            height: 60px;
+            background: #111;
+            border: 1px solid #222;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        
+        .news-item-image.placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #222;
+        }
+        
+        .news-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .news-item-date {
+            font-size: 7px;
+            letter-spacing: 1px;
+            color: #444;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .news-item-date::before {
+            content: '';
+            width: 4px;
+            height: 4px;
+            background: #ff3333;
+            animation: pulse 2s infinite;
+        }
+        
+        .news-item-title {
+            font-size: 11px;
+            font-weight: 500;
+            color: #ddd;
+            line-height: 1.4;
+            margin-bottom: 6px;
+            display: block;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .news-item:hover .news-item-title {
+            color: #00c8ff;
+        }
+        
+        .news-item-preview {
+            font-size: 9px;
+            color: #555;
+            line-height: 1.5;
+            margin-bottom: 10px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .news-item-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .news-item-source {
+            font-size: 7px;
+            letter-spacing: 1px;
+            color: #333;
+        }
+        
+        .news-item-btn {
+            background: transparent;
+            border: 1px solid #333;
+            color: #555;
+            font-size: 8px;
+            letter-spacing: 1px;
+            padding: 5px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        
+        .news-item-btn:hover {
+            border-color: #00c8ff;
+            color: #00c8ff;
+            background: rgba(0, 200, 255, 0.1);
+        }
+        
+        .news-empty {
+            padding: 40px 20px;
+            text-align: center;
+        }
+        
+        .news-empty-icon {
+            font-size: 30px;
+            color: #1a1a1a;
+            margin-bottom: 15px;
+        }
+        
+        .news-empty-text {
+            font-size: 9px;
+            color: #333;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+        
+        .news-empty-sub {
+            font-size: 8px;
+            color: #222;
+        }
+        
+        /* ==========================================
+           NEWS DETAIL MODAL - IMPROVED
+           ========================================== */
+        #news-detail-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 500;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        #news-detail-modal.active {
+            display: flex;
+        }
+        
+        #news-detail-container {
+            width: 550px;
+            max-width: 95%;
+            max-height: 85vh;
+            background: #050505;
+            border: 1px solid #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
+        }
+        
+        #news-detail-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #00c8ff 0%, #ff3333 100%);
+        }
+        
+        #news-detail-header {
+            padding: 18px 22px;
+            background: rgba(0, 200, 255, 0.02);
+            border-bottom: 1px solid #1a1a1a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #news-detail-header-title {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #00c8ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #news-detail-header-title::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: #ff3333;
+            animation: pulse 1.5s infinite;
+        }
+        
+        #news-detail-close {
+            background: none;
+            border: 1px solid #333;
+            color: #555;
+            width: 32px;
+            height: 32px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        #news-detail-close:hover {
+            border-color: #fff;
+            color: #fff;
+        }
+        
+        #news-detail-content {
+            padding: 22px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        #news-detail-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: #111;
+            border: 1px solid #1a1a1a;
+            margin-bottom: 20px;
+        }
+        
+        #news-detail-date {
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: #444;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        #news-detail-date::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            background: #ff3333;
+        }
+        
+        #news-detail-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            line-height: 1.4;
+            margin-bottom: 18px;
+            letter-spacing: 1px;
+        }
+        
+        #news-detail-report {
+            font-size: 11px;
+            color: #888;
+            line-height: 1.8;
+            margin-bottom: 25px;
+        }
+        
+        /* Probability Bars - Improved */
+        .prob-section {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #1a1a1a;
+            padding: 18px;
+        }
+        
+        .prob-title {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #ff3333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .prob-title::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            background: #ff3333;
+        }
+        
+        .prob-item {
+            margin-bottom: 12px;
+        }
+        
+        .prob-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .prob-label {
+            font-size: 8px;
+            color: #555;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .prob-label span:last-child {
+            color: #888;
+            font-weight: 500;
+        }
+        
+        .prob-bar-bg {
+            height: 4px;
+            background: #111;
+            position: relative;
+            border-radius: 2px;
+        }
+        
+        .prob-bar-fill {
+            height: 100%;
+            transition: width 0.8s ease;
+            border-radius: 2px;
+        }
+        
+        .prob-bar-fill.low {
+            background: linear-gradient(90deg, #00c8ff 0%, #00a0cc 100%);
+        }
+        
+        .prob-bar-fill.medium {
+            background: linear-gradient(90deg, #ffaa00 0%, #ff8800 100%);
+        }
+        
+        .prob-bar-fill.high {
+            background: linear-gradient(90deg, #ff3333 0%, #cc0000 100%);
+        }
+        
+        #news-detail-footer {
+            padding: 18px 22px;
+            border-top: 1px solid #1a1a1a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .news-detail-meta {
+            font-size: 8px;
+            color: #333;
+            letter-spacing: 1px;
+        }
+        
+        .news-detail-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .detail-btn {
+            background: transparent;
+            border: 1px solid #333;
+            color: #555;
+            font-size: 9px;
+            letter-spacing: 1px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        
+        .detail-btn:hover {
+            border-color: #fff;
+            color: #fff;
+        }
+        
+        .detail-btn.primary {
+            border-color: #00c8ff;
+            color: #00c8ff;
+        }
+        
+        .detail-btn.primary:hover {
+            background: #00c8ff;
+            color: #000;
+        }
+        
+        /* ==========================================
+           LEAFLET
+           ========================================== */
+        .leaflet-container {
+            background: #000 !important;
+        }
+        
+        .leaflet-control-zoom,
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+        
+        /* Tactical Labels on Map */
+        .tactical-label-overlay div {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-shadow: 0 0 3px #000;
+        }
+        
+        /* Tactics Selector */
+        .tactic-btn {
+            display: block;
+            width: 100%;
+            background: transparent;
+            border: 1px solid #333;
+            color: #888;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 9px;
+            text-align: left;
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tactic-btn:hover {
+            border-color: #00c8ff;
+            color: #fff;
+        }
+        .tactic-btn.active {
+            background: rgba(0, 200, 255, 0.1);
+            border-color: #00c8ff;
+            color: #00c8ff;
+        }
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <!-- Map -->
+    <div id="map-container">
+        <div id="map"></div>
+    </div>
+    
+    <!-- Canvas Overlay -->
+    <canvas id="canvas-overlay"></canvas>
+    
+    <!-- Vignette -->
+    <div class="vignette"></div>
+    
+    <!-- Scan Line -->
+    <div class="scan-line"></div>
+    
+    <!-- Country Name -->
+    <div class="country-name-overlay">
+        <div class="country-name-main" id="country-name-big">LOADING</div>
+        <div class="country-name-sub" id="country-region">TACTICAL REGION</div>
+    </div>
+    
+    <!-- Coordinate Labels -->
+    <div class="coord-label" style="top: 8%; left: 12%;">1942.95</div>
+    <div class="coord-label cyan" style="top: 18%; left: 22%;">379.86</div>
+    <div class="coord-label" style="top: 28%; left: 45%;">ROUTE_KM</div>
+    <div class="coord-label cyan" style="top: 38%; left: 15%;">ROUTE_KM</div>
+    <div class="coord-label" style="top: 48%; left: 55%;">178.24</div>
+    <div class="coord-label cyan" style="top: 55%; left: 28%;">530.92</div>
+    <div class="coord-label" style="top: 62%; left: 48%;">456.70</div>
+    <div class="coord-label cyan" style="top: 68%; left: 35%;">134.11</div>
+    <div class="coord-label" style="top: 75%; left: 58%;">ROUTE_KM</div>
+    <div class="coord-label" style="top: 82%; left: 42%;">ROUTE_KM</div>
+    <div class="coord-label cyan" style="top: 45%; right: 18%;">377.04</div>
+    <div class="coord-label" style="top: 58%; right: 12%;">669.74</div>
+    <div class="coord-label" style="top: 85%; right: 22%;">379.05</div>
+    
+    <!-- Top Left UI -->
+    <div class="ui-top-left">
+        <div class="status-row">
+            <div class="status-dot"></div>
+            <span class="status-text">LIVE SATELLITE FEED</span>
+        </div>
+        <div class="status-row">
+            <div class="status-dot cyan"></div>
+            <span class="status-text" id="timestamp">--:--:-- UTC</span>
+        </div>
+        <div class="status-row">
+            <div class="status-dot green"></div>
+            <span class="status-text" id="news-status">NEWS: LOADING...</span>
+        </div>
+        <div class="zone-box">
+            <div class="zone-text">
+                ZONE: <span id="zone-id">--</span><br>
+                SECTOR: <span id="sector-id">--</span><br>
+                THREAT: <span id="threat-level">MONITORING</span>
+            </div>
+        </div>
+        <div class="zone-box" id="tactics-container" style="display:none; margin-top: 10px; border-left-color: #00c8ff; background: rgba(0, 200, 255, 0.05);">
+            <div class="zone-text" style="margin-bottom:5px; font-weight:bold; color:#00c8ff;">AVAILABLE TACTICS</div>
+            <div id="tactics-list"></div>
+        </div>
+    </div>
+    
+    <!-- News Panel -->
+    <div id="news-panel">
+        <div id="news-panel-header">
+            <div id="news-panel-title">
+                INTELLIGENCE FEED
+                <span class="news-count" id="news-count">(0)</span>
+            </div>
+            <button id="news-panel-toggle" onclick="toggleNewsPanel()">−</button>
+        </div>
+        <div id="news-panel-content">
+            <div class="news-empty">
+                <div class="news-empty-icon">◇</div>
+                <div class="news-empty-text">LOADING FEED...</div>
+                <div class="news-empty-sub">Connecting to data stream</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- News Detail Modal -->
+    <div id="news-detail-modal">
+        <div id="news-detail-container">
+            <div id="news-detail-header">
+                <span id="news-detail-header-title">CLASSIFIED INTEL REPORT</span>
+                <button id="news-detail-close" onclick="closeNewsDetail()">×</button>
+            </div>
+            <div id="news-detail-content">
+                <img id="news-detail-image" src="" alt="">
+                <div id="news-detail-date">TIMESTAMP UNKNOWN</div>
+                <div id="news-detail-title">Title</div>
+                <div id="news-detail-report">Report content...</div>
+                <div class="prob-section">
+                    <div class="prob-title">THREAT ASSESSMENT</div>
+                    <div class="prob-item">
+                        <div class="prob-label">
+                            <span>EINTRITTSWAHRSCHEINLICHKEIT</span>
+                            <span id="prob-occurrence-val">0%</span>
+                        </div>
+                        <div class="prob-bar-bg">
+                            <div class="prob-bar-fill" id="prob-occurrence"></div>
+                        </div>
+                    </div>
+                    <div class="prob-item">
+                        <div class="prob-label">
+                            <span>AUSWIRKUNG</span>
+                            <span id="prob-impact-val">0%</span>
+                        </div>
+                        <div class="prob-bar-bg">
+                            <div class="prob-bar-fill" id="prob-impact"></div>
+                        </div>
+                    </div>
+                    <div class="prob-item">
+                        <div class="prob-label">
+                            <span>QUELLEN-ZUVERLÄSSIGKEIT</span>
+                            <span id="prob-reliability-val">0%</span>
+                        </div>
+                        <div class="prob-bar-bg">
+                            <div class="prob-bar-fill" id="prob-reliability"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="news-detail-footer">
+                <div class="news-detail-meta" id="news-detail-source">SOURCE: CLASSIFIED</div>
+                <div class="news-detail-buttons">
+                    <button class="detail-btn" onclick="closeNewsDetail()">SCHLIEßEN</button>
+                    <button class="detail-btn primary" onclick="openNewsLink()">QUELLE ÖFFNEN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bottom Info -->
+    <div class="ui-bottom">
+        <div class="info-text" id="info-main">Tactical surveillance active</div>
+        <div class="info-sub">□ <span id="center-coords">LAT 0.00 | LNG 0.00</span></div>
+    </div>
+    
+    <!-- Close -->
+    <button id="close-btn" onclick="closeModule()">×</button>
+
+    <script src="http://localhost:3001/atlas-api.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
+        
+        const params = new URLSearchParams(window.location.search);
+        const countryName = params.get('country') || 'Unknown';
+        
+        document.getElementById('country-name-big').textContent = countryName.toUpperCase();
+        
+        // Canvas setup
+        const canvas = document.getElementById('canvas-overlay');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Timestamp
+        function updateTime() {
+            document.getElementById('timestamp').textContent = 
+                new Date().toISOString().substring(11, 19) + ' UTC';
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        // ==========================================
+        // NEWS DATA
+        // ==========================================
+        
+        let newsData = [];
+        let currentNewsItem = null;
+        let fullCountryData = null;
+        let tacticalLayerGroup = null;
+        let tacticalAnimLayer = null; // For animations
+        let currentTacticalShapes = []; // For animation loop
+
+        async function loadData() {
+            newsData = [];
+            fullCountryData = null;
+
+            try {
+                // Fetch country data and news data in parallel
+                const [countryResponse, newsResponse] = await Promise.all([
+                    ATLAS_API.getCountry(countryName),
+                    ATLAS_API.getNews({ country: countryName, limit: 50, sort: 'desc' })
+                ]);
+
+                if (countryResponse.status === 'success' && countryResponse.data) {
+                    fullCountryData = countryResponse.data;
+                    updateTacticsList();
+                }
+
+                if (newsResponse.status === 'success' && newsResponse.data) {
+                    // The API returns news items. We need to map them to the format this page expects.
+                    newsData = newsResponse.data.map(item => ({
+                        title: item.title,
+                        link: item.url || item.link,
+                        preview: item.description || 'No preview available.',
+                        report: item.content || item.description || 'No detailed report available.',
+                        image: item.image,
+                        date: item.publishedAt || item.date || new Date().toISOString(),
+                        source: item.source || 'CLASSIFIED',
+                        // The API doesn't seem to provide these, so we'll use defaults.
+                        probs: item.probs || { occurrence: 50, impact: 50, reliability: 80 }, 
+                        linkedTactic: item.linkedTactic // Assuming API might provide this
+                    }));
+                }
+
+            } catch (error) {
+                console.error("Failed to load data from API:", error);
+                document.getElementById('news-status').textContent = 'NEWS: OFFLINE';
+                document.getElementById('threat-level').textContent = 'UNKNOWN';
+            }
+
+            // Fallback: Add demo news if no data available
+            if (newsData.length === 0) {
+                newsData = [
+                    {
+                        title: `Aktuelle Entwicklungen in ${countryName}`,
+                        preview: 'Geopolitische Spannungen erfordern erhöhte Aufmerksamkeit. Mehrere Faktoren deuten auf mögliche Veränderungen in der Region hin.',
+                        report: 'Detaillierte Analyse der aktuellen Lage in der Region. Unsere Quellen berichten von verstärkten diplomatischen Aktivitäten und wirtschaftlichen Veränderungen, die Auswirkungen auf die regionale Stabilität haben könnten.',
+                        image: '',
+                        date: new Date().toISOString().substring(0, 10),
+                        source: 'ATLAS INTEL',
+                        link: '#',
+                        probs: { occurrence: 65, impact: 45, reliability: 80 }
+                    },
+                    {
+                        title: 'Wirtschaftliche Indikatoren unter Beobachtung',
+                        preview: 'Finanzmarkt-Analysten beobachten kritische Entwicklungen in diesem Sektor.',
+                        report: 'Ökonomische Daten zeigen Veränderungen im Handelsvolumen und bei Investitionsströmen. Weitere Beobachtung empfohlen.',
+                        image: '',
+                        date: new Date().toISOString().substring(0, 10),
+                        source: 'ECON DIVISION',
+                        link: '#',
+                        probs: { occurrence: 40, impact: 70, reliability: 60 }
+                    },
+                    {
+                        title: 'Sicherheitslage: Status Update',
+                        preview: 'Regelmäßige Überprüfung der Sicherheitsparameter abgeschlossen.',
+                        report: 'Die Sicherheitslage bleibt stabil, jedoch werden bestimmte Entwicklungen weiterhin überwacht. Alle Parameter innerhalb normaler Grenzen.',
+                        image: '',
+                        date: new Date().toISOString().substring(0, 10),
+                        source: 'SEC OPS',
+                        link: '#',
+                        probs: { occurrence: 25, impact: 55, reliability: 90 }
+                    }
+                ];
+            } else {
+                // Sort mixed data by date descending
+                newsData.sort((a, b) => new Date(b.date) - new Date(a.date));
+            }
+            
+            // Update threat level from country data
+            if (fullCountryData && fullCountryData.security && fullCountryData.security.bedrohungslevel) {
+                document.getElementById('threat-level').textContent = fullCountryData.security.bedrohungslevel.toUpperCase();
+            }
+
+            // Update status
+            document.getElementById('news-status').textContent = `NEWS: ${newsData.length} REPORTS`;
+            document.getElementById('news-count').textContent = `(${newsData.length})`;
+            
+            renderNews();
+        }
+        
+
+        function renderNews() {
+            const container = document.getElementById('news-panel-content');
+            
+            if (newsData.length === 0) {
+                container.innerHTML = `
+                    <div class="news-empty">
+                        <div class="news-empty-icon">◇</div>
+                        <div class="news-empty-text">NO INTELLIGENCE DATA</div>
+                        <div class="news-empty-sub">Add news via Developer Interface</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            newsData.forEach((news, index) => {
+                const imageHtml = news.image 
+                    ? `<img class="news-item-image" src="${news.image}" alt="" onerror="this.classList.add('placeholder'); this.innerHTML='◇';">`
+                    : `<div class="news-item-image placeholder">◇</div>`; 
+                    
+                html += `
+                    <div class="news-item" onclick="openNewsDetail(${index})">
+                        <div class="news-item-header">
+                            ${imageHtml}
+                            <div class="news-item-info">
+                                <div class="news-item-date">${new Date(news.date).toLocaleString() || 'DATE UNKNOWN'}</div>
+                                <span class="news-item-title">${news.title || 'Untitled Report'}</span>
+                                <div class="news-item-preview">${news.preview || 'No preview available.'}</div>
+                                <div class="news-item-footer">
+                                    <span class="news-item-source">SRC: ${news.source || 'UNKNOWN'}</span>
+                                    <button class="news-item-btn" onclick="event.stopPropagation(); openNewsDetail(${index})">DETAILS</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function openNewsDetail(index) {
+            currentNewsItem = newsData[index];
+            if (!currentNewsItem) return;
+            
+            // Set image
+            const imgEl = document.getElementById('news-detail-image');
+            if (currentNewsItem.image) {
+                imgEl.src = currentNewsItem.image;
+                imgEl.style.display = 'block';
+            } else {
+                imgEl.style.display = 'none';
+            }
+            
+            // Set content
+            document.getElementById('news-detail-date').textContent = currentNewsItem.date || 'TIMESTAMP UNKNOWN';
+            document.getElementById('news-detail-title').textContent = currentNewsItem.title || 'Untitled';
+            document.getElementById('news-detail-report').textContent = currentNewsItem.report || currentNewsItem.preview || 'No detailed report available.';
+            document.getElementById('news-detail-source').textContent = `SOURCE: ${currentNewsItem.source || 'CLASSIFIED'}`;
+            
+            // Set probability bars
+            const probs = currentNewsItem.probs || { occurrence: 0, impact: 0, reliability: 0 };
+            
+            setProbBar('occurrence', probs.occurrence || 0);
+            setProbBar('impact', probs.impact || 0);
+            setProbBar('reliability', probs.reliability || 0);
+            
+            // Show modal
+            document.getElementById('news-detail-modal').classList.add('active');
+            
+            // Render linked tactical map if available
+            if (currentNewsItem.linkedTactic !== undefined && currentNewsItem.linkedTactic !== -1) {
+                renderTacticalOverlay(currentNewsItem.linkedTactic);
+            }
+        }
+        
+        function setProbBar(type, value) {
+            const bar = document.getElementById(`prob-${type}`);
+            const val = document.getElementById(`prob-${type}-val`);
+            
+            // Animate the bar
+            setTimeout(() => {
+                bar.style.width = value + '%';
+            }, 100);
+            
+            val.textContent = value + '%';
+            
+            // Set color class
+            bar.classList.remove('low', 'medium', 'high');
+            if (value < 40) {
+                bar.classList.add('low');
+            } else if (value < 70) {
+                bar.classList.add('medium');
+            } else {
+                bar.classList.add('high');
+            }
+        }
+        
+        function closeNewsDetail() {
+            document.getElementById('news-detail-modal').classList.remove('active');
+            
+            // Reset bars for animation on next open
+            document.getElementById('prob-occurrence').style.width = '0%';
+            document.getElementById('prob-impact').style.width = '0%';
+            document.getElementById('prob-reliability').style.width = '0%';
+            
+            currentNewsItem = null;
+            
+            // Clear tactical map
+            if (tacticalLayerGroup) {
+                tacticalLayerGroup.clearLayers();
+                if (tacticalAnimLayer) tacticalAnimLayer.clearLayers();
+                currentTacticalShapes = [];
+                // Optional: Reset view to country bounds if needed
+                if (countryBounds) map.fitBounds(countryBounds, { padding: [80, 80] });
+            }
+        }
+        
+        function openNewsLink() {
+            if (currentNewsItem && currentNewsItem.link && currentNewsItem.link !== '#') {
+                window.open(currentNewsItem.link, '_blank');
+            }
+        }
+        
+        let newsPanelCollapsed = false;
+        function toggleNewsPanel() {
+            const content = document.getElementById('news-panel-content');
+            const btn = document.getElementById('news-panel-toggle');
+            
+            newsPanelCollapsed = !newsPanelCollapsed;
+            
+            if (newsPanelCollapsed) {
+                content.style.display = 'none';
+                btn.textContent = '+';
+            } else {
+                content.style.display = 'block';
+                btn.textContent = '−';
+            }
+        }
+        
+        // ==========================================
+        // TACTICAL MAP RENDERING
+        // ==========================================
+        
+        function updateTacticsList() {
+            const container = document.getElementById('tactics-container');
+            const list = document.getElementById('tactics-list');
+            list.innerHTML = '';
+            
+            if (fullCountryData && fullCountryData.tactics && fullCountryData.tactics.length > 0) {
+                container.style.display = 'block';
+                fullCountryData.tactics.forEach((t, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'tactic-btn';
+                    btn.textContent = `> ${t.name}`;
+                    btn.onclick = () => renderTacticalOverlay(i);
+                    list.appendChild(btn);
+                });
+            } else {
+                container.style.display = 'none';
+            }
+        }
+        
+        function renderTacticalOverlay(tacticIndex) {
+            if (!tacticalLayerGroup) return;
+            tacticalLayerGroup.clearLayers();
+            if (tacticalAnimLayer) tacticalAnimLayer.clearLayers();
+            currentTacticalShapes = [];
+            
+            if (!fullCountryData || !fullCountryData.tactics || !fullCountryData.tactics[tacticIndex]) return;
+            
+            const tactic = fullCountryData.tactics[tacticIndex];
+            
+            // Update UI buttons
+            document.querySelectorAll('.tactic-btn').forEach((b, i) => {
+                if (i === tacticIndex) b.classList.add('active');
+                else b.classList.remove('active');
+            });
+            
+            if (!tactic.data) return;
+            
+            try {
+                const shapes = JSON.parse(tactic.data);
+                currentTacticalShapes = shapes; // Store for animation loop
+                shapes.forEach(s => {
+                    const color = s.color || '#00ff00';
+                    const dash = s.dashArray || null;
+                    
+                    if (s.type === 'circle') {
+                        L.circle([s.lat, s.lng], { 
+                            color: color, fillColor: color, fillOpacity: 0.1, radius: s.radius, weight: 1, dashArray: dash 
+                        }).addTo(tacticalLayerGroup);
+                    } else if (s.type === 'line') {
+                        L.polyline(s.points, { color: color, weight: 2, dashArray: dash }).addTo(tacticalLayerGroup);
+                        if (s.points.length > 0) {
+                            L.circleMarker(s.points[s.points.length-1], { radius: 2, color: color, fillColor: color, fillOpacity: 1 }).addTo(tacticalLayerGroup);
+                        }
+                    } else if (s.type === 'polygon') {
+                        L.polygon(s.points, { color: color, fillColor: color, fillOpacity: 0.2, weight: 1, dashArray: dash }).addTo(tacticalLayerGroup);
+                    } else if (s.type === 'marker') {
+                        L.circleMarker([s.lat, s.lng], { radius: 4, color: color, fillColor: '#000', fillOpacity: 1, weight: 2 }).addTo(tacticalLayerGroup);
+                    } else if (s.type === 'text') {
+                        const icon = L.divIcon({
+                            className: 'tactical-label-overlay',
+                            html: `<div style="color:${color}">${s.content}</div>`,
+                            iconSize: [null, null],
+                            iconAnchor: [10, 10]
+                        });
+                        L.marker([s.lat, s.lng], { icon: icon }).addTo(tacticalLayerGroup);
+                    }
+                });
+                
+                // Fly to the tactical situation
+                if (tacticalLayerGroup.getLayers().length > 0) {
+                    const group = L.featureGroup(tacticalLayerGroup.getLayers());
+                    map.flyToBounds(group.getBounds(), { padding: [50, 50], duration: 1.5 });
+                }
+                
+            } catch(e) { console.error("Error rendering tactic", e); }
+        }
+        
+        // ==========================================
+        // MAP
+        // ==========================================
+        
+        let map;
+        let countryBounds;
+        
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false,
+                dragging: true,
+                scrollWheelZoom: true
+            }).setView([0, 0], 2);
+            
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 18
+            }).addTo(map);
+            
+            document.querySelector('.leaflet-tile-pane').style.filter = 
+                'brightness(0.35) contrast(1.3) saturate(0.2)';
+            
+            tacticalLayerGroup = L.layerGroup().addTo(map);
+            tacticalAnimLayer = L.layerGroup().addTo(map);
+            
+            loadCountry();
+        }
+        
+        function loadCountry() {
+            fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson')
+                .then(res => res.json())
+                .then(data => {
+                    const country = data.features.find(f => f.properties.ADMIN === countryName);
+                    
+                    if (country) {
+                        // Country outline - cyan
+                        L.geoJSON(country, {
+                            style: {
+                                color: '#00c8ff',
+                                weight: 1.5,
+                                opacity: 0.6,
+                                fillColor: '#00c8ff',
+                                fillOpacity: 0.03
+                            }
+                        }).addTo(map);
+                        
+                        // Glow effect
+                        L.geoJSON(country, {
+                            style: {
+                                color: '#00c8ff',
+                                weight: 4,
+                                opacity: 0.15,
+                                fill: false
+                            }
+                        }).addTo(map);
+                        
+                        // Fit bounds
+                        const layer = L.geoJSON(country);
+                        countryBounds = layer.getBounds();
+                        map.fitBounds(countryBounds, { padding: [80, 80] });
+                        
+                        // Update UI
+                        const center = countryBounds.getCenter();
+                        document.getElementById('center-coords').textContent = 
+                            `LAT ${center.lat.toFixed(2)} | LNG ${center.lng.toFixed(2)}`;
+                        document.getElementById('country-region').textContent = 
+                            country.properties.REGION_WB || 'TACTICAL REGION';
+                        document.getElementById('zone-id').textContent = 
+                            country.properties.ISO_A2 || 'N/A';
+                        document.getElementById('sector-id').textContent = 
+                            `${Math.floor(Math.random() * 99).toString().padStart(2, '0')}.X${Math.floor(Math.random() * 9)}`;
+                        
+                        // Start canvas overlay animation
+                        setTimeout(startOverlayAnimation, 1000);
+                    }
+                });
+        }
+        
+        // ==========================================
+        // CANVAS OVERLAY ANIMATION
+        // ==========================================
+        
+        let markers = [];
+        let aircrafts = [];
+        let borderStrokes = [];
+        let gridLines = [];
+        let connectionLines = [];
+        let animationFrame = 0;
+        
+        function startOverlayAnimation() {
+            // Generate markers
+            for (let i = 0; i < 25; i++) {
+                markers.push({
+                    x: Math.random() * canvas.width * 0.7 + canvas.width * 0.1,
+                    y: Math.random() * canvas.height * 0.7 + canvas.height * 0.1,
+                    radius: 8 + Math.random() * 12,
+                    pulsePhase: Math.random() * Math.PI * 2,
+                    hasInner: Math.random() > 0.3,
+                    isCyan: Math.random() > 0.4
+                });
+            }
+            
+            // Generate aircraft
+            for (let i = 0; i < 5; i++) {
+                aircrafts.push({
+                    x: Math.random() * canvas.width * 0.6 + canvas.width * 0.15,
+                    y: Math.random() * canvas.height * 0.5 + canvas.height * 0.1,
+                    rotation: Math.random() * Math.PI * 2,
+                    speed: 0.2 + Math.random() * 0.3
+                });
+            }
+            
+            // Generate border strokes
+            generateBorderStrokes();
+            
+            // Generate grid lines
+            for (let i = 0; i < 15; i++) {
+                const isVertical = Math.random() > 0.5;
+                gridLines.push({
+                    isVertical: isVertical,
+                    offset: Math.random() * (isVertical ? canvas.width : canvas.height)
+                });
+            }
+            
+            // Generate connections
+            for (let i = 0; i < markers.length - 1; i++) {
+                if (Math.random() > 0.5) {
+                    const j = Math.min(i + 1 + Math.floor(Math.random() * 3), markers.length - 1);
+                    connectionLines.push({
+                        from: i,
+                        to: j,
+                        opacity: 0.1 + Math.random() * 0.2
+                    });
+                }
+            }
+            
+            animate();
+        }
+        
+        function generateBorderStrokes() {
+            const numStrokes = 60;
+            const margin = 50;
+            
+            // Top edge
+            for (let i = 0; i < numStrokes / 4; i++) {
+                const x = margin + (canvas.width - margin * 2) * (i / (numStrokes / 4));
+                const variance = Math.sin(i * 0.5) * 30;
+                borderStrokes.push({
+                    x: x,
+                    y: margin + 80 + variance + Math.random() * 20,
+                    angle: -Math.PI / 2 + (Math.random() - 0.5) * 0.3,
+                    length: 15 + Math.random() * 10
+                });
+            }
+            
+            // Right edge
+            for (let i = 0; i < numStrokes / 3; i++) {
+                const t = i / (numStrokes / 3);
+                const x = canvas.width - margin - 100 + Math.sin(t * Math.PI) * 80;
+                const y = margin + 100 + t * (canvas.height - margin * 2 - 150);
+                borderStrokes.push({
+                    x: x + Math.random() * 30,
+                    y: y,
+                    angle: Math.PI / 2 + Math.cos(t * Math.PI) * 0.5,
+                    length: 12 + Math.random() * 8
+                });
+            }
+            
+            // Bottom
+            for (let i = 0; i < numStrokes / 4; i++) {
+                borderStrokes.push({
+                    x: margin + Math.random() * (canvas.width - margin * 2) * 0.7,
+                    y: canvas.height - margin - 80 - Math.random() * 50,
+                    angle: Math.PI / 2 + (Math.random() - 0.5) * 0.4,
+                    length: 10 + Math.random() * 12
+                });
+            }
+        }
+        
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            animationFrame++;
+            
+            // Grid lines
+            ctx.strokeStyle = 'rgba(0, 200, 255, 0.08)';
+            ctx.lineWidth = 1;
+            gridLines.forEach(line => {
+                ctx.beginPath();
+                if (line.isVertical) {
+                    ctx.moveTo(line.offset, 0);
+                    ctx.lineTo(line.offset, canvas.height);
+                } else {
+                    ctx.moveTo(0, line.offset);
+                    ctx.lineTo(canvas.width, line.offset);
+                }
+                ctx.stroke();
+            });
+            
+            // Connection lines
+            ctx.strokeStyle = 'rgba(0, 200, 255, 0.15)';
+            ctx.lineWidth = 0.5;
+            connectionLines.forEach(conn => {
+                const from = markers[conn.from];
+                const to = markers[conn.to];
+                ctx.globalAlpha = conn.opacity;
+                ctx.beginPath();
+                ctx.moveTo(from.x, from.y);
+                ctx.lineTo(to.x, to.y);
+                ctx.stroke();
+            });
+            ctx.globalAlpha = 1;
+            
+            // Border strokes
+            borderStrokes.forEach((stroke, i) => {
+                const pulse = Math.sin(animationFrame * 0.02 + i * 0.2) * 0.3 + 0.7;
+                ctx.strokeStyle = `rgba(255, 50, 50, ${0.6 * pulse})`;
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(stroke.x, stroke.y);
+                ctx.lineTo(
+                    stroke.x + Math.cos(stroke.angle) * stroke.length,
+                    stroke.y + Math.sin(stroke.angle) * stroke.length
+                );
+                ctx.stroke();
+            });
+            
+            // Markers
+            markers.forEach((marker, i) => {
+                const pulse = Math.sin(animationFrame * 0.03 + marker.pulsePhase) * 0.3 + 0.7;
+                const color = marker.isCyan ? '0, 200, 255' : '255, 255, 255';
+                
+                ctx.strokeStyle = `rgba(${color}, ${0.2 * pulse})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(marker.x, marker.y, marker.radius + 5, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.strokeStyle = `rgba(${color}, ${0.5 * pulse})`;
+                ctx.beginPath();
+                ctx.arc(marker.x, marker.y, marker.radius, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                if (marker.hasInner) {
+                    ctx.fillStyle = marker.isCyan ? 
+                        `rgba(0, 200, 255, ${0.8 * pulse})` : 
+                        `rgba(255, 50, 50, ${0.8 * pulse})`;
+                    ctx.beginPath();
+                    ctx.arc(marker.x, marker.y, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                if (i % 4 === 0) {
+                    ctx.strokeStyle = `rgba(${color}, ${0.3 * pulse})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(marker.x - marker.radius - 3, marker.y);
+                    ctx.lineTo(marker.x + marker.radius + 3, marker.y);
+                    ctx.moveTo(marker.x, marker.y - marker.radius - 3);
+                    ctx.lineTo(marker.x, marker.y + marker.radius + 3);
+                    ctx.stroke();
+                }
+            });
+            
+            // Aircraft
+            aircrafts.forEach(aircraft => {
+                aircraft.x += Math.cos(aircraft.rotation) * aircraft.speed;
+                aircraft.y += Math.sin(aircraft.rotation) * aircraft.speed;
+                
+                if (aircraft.x < 0) aircraft.x = canvas.width;
+                if (aircraft.x > canvas.width) aircraft.x = 0;
+                if (aircraft.y < 0) aircraft.y = canvas.height;
+                if (aircraft.y > canvas.height) aircraft.y = 0;
+                
+                ctx.save();
+                ctx.translate(aircraft.x, aircraft.y);
+                ctx.rotate(aircraft.rotation + Math.PI / 2);
+                
+                ctx.fillStyle = '#ff3333';
+                ctx.beginPath();
+                ctx.moveTo(0, -12);
+                ctx.lineTo(8, 8);
+                ctx.lineTo(0, 4);
+                ctx.lineTo(-8, 8);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.strokeStyle = 'rgba(255, 50, 50, 0.4)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(-15, -15, 30, 30);
+                
+                ctx.restore();
+            });
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // ==========================================
+        // TACTICAL ANIMATION LOOP
+        // ==========================================
+        let tacAnimTime = 0;
+        function animateTactics() {
+            tacAnimTime += 0.005;
+            if (tacAnimTime > 1) tacAnimTime = 0;
+            
+            if (tacticalAnimLayer) tacticalAnimLayer.clearLayers();
+            
+            if (currentTacticalShapes && currentTacticalShapes.length > 0) {
+                currentTacticalShapes.forEach(s => {
+                    if (s.animation === 'missile' && s.type === 'line' && s.points && s.points.length >= 2) {
+                        const travelPhase = 0.85;
+                        
+                        if (tacAnimTime <= travelPhase) {
+                        // Interpolate position
+                        const totalIdx = s.points.length - 1;
+                        const normalizedTime = tacAnimTime / travelPhase;
+                        const currentPos = normalizedTime * totalIdx;
+                        const idx = Math.floor(currentPos);
+                        const t = currentPos - idx;
+                        
+                        if (idx < totalIdx) {
+                            const p1 = s.points[idx]; // [lat, lng]
+                            const p2 = s.points[idx+1];
+                            
+                            // Handle both array formats [lat, lng] and {lat, lng} if necessary, 
+                            // but usually JSON stores as arrays for lines
+                            const lat1 = Array.isArray(p1) ? p1[0] : p1.lat;
+                            const lng1 = Array.isArray(p1) ? p1[1] : p1.lng;
+                            const lat2 = Array.isArray(p2) ? p2[0] : p2.lat;
+                            const lng2 = Array.isArray(p2) ? p2[1] : p2.lng;
+                            
+                            const lat = lat1 + (lat2 - lat1) * t;
+                            const lng = lng1 + (lng2 - lng1) * t;
+                            
+                            // Draw projectile
+                            L.circleMarker([lat, lng], {
+                                radius: 4, color: '#ff0000', fillColor: '#ff0000', fillOpacity: 1, stroke: false
+                            }).addTo(tacticalAnimLayer);
+                        }
+                        } else {
+                            // Explosion phase
+                            const explosionTime = (tacAnimTime - travelPhase) / (1 - travelPhase);
+                            const power = s.animationPower || 1;
+                            const maxRadius = 10 + (power * 15);
+                            const currentRadius = explosionTime * maxRadius;
+                            const opacity = 1 - explosionTime;
+                            
+                            const lastP = s.points[s.points.length - 1];
+                            const lat = Array.isArray(lastP) ? lastP[0] : lastP.lat;
+                            const lng = Array.isArray(lastP) ? lastP[1] : lastP.lng;
+                            
+                            L.circleMarker([lat, lng], {
+                                radius: currentRadius,
+                                color: '#ff3333',
+                                fillColor: '#ffaa00',
+                                fillOpacity: opacity * 0.6,
+                                weight: 2,
+                                opacity: opacity
+                            }).addTo(tacticalAnimLayer);
+                        }
+                    }
+                });
+            }
+            requestAnimationFrame(animateTactics);
+        }
+        animateTactics();
+        
+        // ==========================================
+        // CLOSE
+        // ==========================================
+        
+        function closeModule() {
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'CLOSE_MODULE' }, '*');
+            } else {
+                window.history.back();
+            }
+        }
+        
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                if (document.getElementById('news-detail-modal').classList.contains('active')) {
+                    closeNewsDetail();
+                } else {
+                    closeModule();
+                }
+            }
+        });
+        
+        // ==========================================
+        // START
+        // ==========================================
+        
+        initMap();
+        loadData();
+        
+        // Refresh news periodically
+        setInterval(loadData, 30000); // Refresh every 30 seconds
+    </script>
+</body>
+</html>

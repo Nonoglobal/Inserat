@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATLAS - History</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background: #050505;
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 20px 40px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #000;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .title::before {
+            content: '';
+            display: block;
+            width: 8px;
+            height: 8px;
+            background: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        .content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            background: radial-gradient(circle at top right, #111 0%, #000 100%);
+        }
+
+        .history-entry {
+            max-width: 800px;
+            margin-bottom: 40px;
+            border-left: 2px solid #333;
+            padding-left: 20px;
+        }
+
+        .year {
+            font-size: 18px;
+            color: #00ff00;
+            font-weight: bold;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .text {
+            font-size: 14px;
+            line-height: 1.8;
+            color: #ccc;
+        }
+
+        #close-btn {
+            background: transparent;
+            border: 1px solid #333;
+            color: #fff;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #close-btn:hover {
+            background: #fff;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title" id="page-title">HISTORY ARCHIVE</div>
+        <button id="close-btn" onclick="closeModule()">×</button>
+    </div>
+    <div class="content" id="history-content">
+        <div class="history-entry">
+            <div class="year">SYSTEM ACCESS</div>
+            <div class="text">Connecting to historical database... No records found for this region in the public shard.</div>
+        </div>
+    </div>
+
+    <script src="http://localhost:3001/atlas-api.js"></script>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const country = params.get('country') || 'Unknown';
+
+        function closeModule() {
+            // Sendet Nachricht an index.html, um das Overlay zu schließen
+            window.parent.postMessage({ type: 'CLOSE_MODULE' }, '*');
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeModule();
+        });
+        
+        async function loadHistoryData() {
+            document.getElementById('page-title').textContent = `HISTORY: ${country.toUpperCase()}`;
+            const content = document.getElementById('history-content');
+
+            try {
+                const response = await ATLAS_API.getCountry(country);
+                const data = response.data;
+
+                if (!data) {
+                    throw new Error("No data returned from API.");
+                }
+
+                let html = '';
+                
+                // Intel History
+                if (data.intel && Object.keys(data.intel).length > 0) {
+                    html += `
+                        <div class="history-entry">
+                            <div class="year">POLITICAL CONTEXT</div>
+                            <div class="text">
+                                Government: ${data.intel.regierung || 'N/A'}<br>
+                                Leadership: ${data.intel.staatsoberhaupt || 'N/A'}<br>
+                                Current Status: ${data.intel.konflikt || 'Stable'}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Economic History
+                if (data.economy && Object.keys(data.economy).length > 0) {
+                    html += `
+                        <div class="history-entry">
+                            <div class="year">ECONOMIC BACKGROUND</div>
+                            <div class="text">
+                                GDP: ${data.economy.bip || 'N/A'}<br>
+                                Key Industries: ${data.economy.hauptindustrien || 'N/A'}<br>
+                                ${data.economy.kriegsschaden ? `War Damage: ${data.economy.kriegsschaden}<br>` : ''}
+                                ${data.economy.sanktionen ? `Sanctions: ${data.economy.sanktionen}` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Security
+                if (data.security && Object.keys(data.security).length > 0) {
+                    html += `
+                        <div class="history-entry">
+                            <div class="year">SECURITY LOG</div>
+                            <div class="text">
+                                Status: ${data.security.status || 'N/A'}<br>
+                                Threat Level: ${data.security.bedrohungslevel || 'N/A'}<br>
+                                Alignment: ${data.security.nato || 'Neutral'}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (html) {
+                    content.innerHTML = html;
+                } else {
+                    content.innerHTML = '<div class="history-entry"><div class="year">NO DATA</div><div class="text">No historical data available for this region in the active database.</div></div>';
+                }
+            } catch (error) {
+                console.error("Failed to load history data:", error);
+                content.innerHTML = `<div class="history-entry"><div class="year">CONNECTION ERROR</div><div class="text">Could not retrieve data for ${country}. Please check the API server.</div></div>`;
+            }
+        }
+
+        loadHistoryData();
+    </script>
+</body>
+</html>

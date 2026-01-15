@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Map Editor</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;700&display=swap');
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #0b0f1a;
+      color: white;
+      font-family: 'Roboto Mono', monospace;
+      overflow: hidden;
+    }
+
+    #topbar {
+      height: 60px;
+      background: #000;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 15px;
+      justify-content: space-between;
+    }
+
+    #map {
+      height: calc(100% - 60px);
+      width: 100%;
+      background: #000;
+    }
+
+    .control-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    select, button {
+      background: #000;
+      color: white;
+      border: 1px solid #333;
+      padding: 8px 12px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+
+    select:focus, button:focus { outline: none; border-color: #00ff00; }
+    button:hover { background: #1a1a1a; color: #fff; border-color: #fff; }
+
+    .btn-save {
+        background: #00ff00;
+        color: #000;
+        border-color: #00ff00;
+        font-weight: bold;
+    }
+    .btn-save:hover { background: #00cc00; border-color: #00cc00; }
+
+    .btn-close {
+        border-color: #ff3333;
+        color: #ff3333;
+    }
+    .btn-close:hover { background: #ff3333; color: #000; }
+    
+    input[type="color"] {
+        -webkit-appearance: none;
+        border: none;
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        background: none;
+        cursor: pointer;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: 1px solid #333; }
+
+    /* Leaflet Dark Mode */
+    .leaflet-tile-pane { filter: brightness(0.35) contrast(1.3) saturate(0.2); }
+    .leaflet-container { background: #000 !important; }
+    
+    /* Draw Toolbar Customization */
+    .leaflet-draw-toolbar a { background-color: #000; border-color: #333; color: #fff; }
+    .leaflet-draw-toolbar a:hover { background-color: #222; }
+    .leaflet-draw-actions { background-color: #000; }
+    .leaflet-draw-actions a { background-color: #111; color: #fff; border-left: 1px solid #333; }
+
+    /* Tactical Text Label */
+    .tactical-label div {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 11px;
+        font-weight: bold;
+        text-transform: uppercase;
+        white-space: nowrap;
+        text-shadow: 0 0 3px #000;
+        letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="control-group">
+      <div id="info-label" style="font-weight:bold; color:#00c8ff;">LOADING...</div>
+  </div>
+
+  <div class="control-group">
+      <label>COLOR:</label>
+      <input type="color" id="color-picker" value="#00ff00">
+      
+      <label>STYLE:</label>
+      <select id="style-select">
+        <option value="">SOLID</option>
+        <option value="5,5">DASHED</option>
+        <option value="1,5">DOTTED</option>
+      </select>
+  </div>
+
+  <div class="control-group">
+      <label>FORM:</label>
+      <select id="shape-mode">
+          <option value="normal">NORMAL</option>
+          <option value="arc">ARC (ROCKET)</option>
+      </select>
+      
+      <label>ANIM:</label>
+      <select id="anim-mode">
+          <option value="none">NONE</option>
+          <option value="loop">LOOP</option>
+          <option value="missile">MISSILE</option>
+      </select>
+      
+      <label>PWR:</label>
+      <input type="number" id="anim-power" min="1" max="10" value="1" style="width: 35px; background: #000; color: #fff; border: 1px solid #333; padding: 4px;">
+  </div>
+
+  <div class="control-group">
+      <button onclick="enableTextMode()" id="btn-text">ADD TEXT</button>
+      <button onclick="toggleGrid()" id="btn-grid">GRID: OFF</button>
+  </div>
+
+  <div class="control-group">
+      <button class="btn-close" onclick="closeEditor()">CANCEL</button>
+      <button class="btn-save" onclick="saveData()">SAVE & CLOSE</button>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+<script>
+  // 1. Setup Map
+  const map = L.map("map", { zoomControl: false }).setView([0, 0], 3);
+  L.control.zoom({ position: 'topright' }).addTo(map);
+
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 18,
+      attribution: 'Esri'
+  }).addTo(map);
+
+  // 2. Feature Group for Drawn Items
+  const drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
+  
+  // Animation Layer
+  const animLayer = L.layerGroup().addTo(map);
+
+  // 3. Initialize Draw Control
+  const drawControl = new L.Control.Draw({
+    position: 'topleft',
+    edit: {
+      featureGroup: drawnItems
+    },
+    draw: {
+      polyline: { shapeOptions: { color: '#00ff00' } },
+      polygon: { shapeOptions: { color: '#00ff00' }, allowIntersection: false },
+      rectangle: { shapeOptions: { color: '#00ff00' } },
+      circle: { shapeOptions: { color: '#00ff00' } },
+      marker: true,
+      circlemarker: false
+    }
+  });
+  map.addControl(drawControl);
+
+  // 4. Handle Creation
+  map.on(L.Draw.Event.CREATED, function (event) {
+    const layer = event.layer;
+    const color = document.getElementById('color-picker').value;
+    const dashArray = document.getElementById('style-select').value;
+    const shapeMode = document.getElementById('shape-mode').value;
+    const animMode = document.getElementById('anim-mode').value;
+    const animPower = parseInt(document.getElementById('anim-power').value) || 1;
+    
+    // Handle Arc Mode for Polylines
+    if (shapeMode === 'arc' && layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+        const latlngs = layer.getLatLngs();
+        if (latlngs.length === 2) {
+            const arcPoints = getArcPoints(latlngs[0], latlngs[1]);
+            layer.setLatLngs(arcPoints);
+            layer.options.isArc = true;
+            layer.options.origStart = latlngs[0];
+            layer.options.origEnd = latlngs[1];
+        }
+    }
+    
+    // Apply selected color
+    if (layer.setStyle) {
+        layer.setStyle({ 
+            color: color, 
+            fillColor: color,
+            dashArray: dashArray,
+            weight: shapeMode === 'arc' ? 3 : 3,
+            opacity: shapeMode === 'arc' ? 0.8 : 1
+        });
+    }
+    // Store color in options for later retrieval
+    layer.options.color = color;
+    layer.options.dashArray = dashArray;
+    layer.options.animation = animMode;
+    layer.options.animationPower = animPower;
+    
+    drawnItems.addLayer(layer);
+  });
+
+  // Text Label Tool
+  let textMode = false;
+  function enableTextMode() {
+      textMode = true;
+      document.getElementById('map').style.cursor = 'crosshair';
+      document.getElementById('btn-text').style.background = '#fff';
+      document.getElementById('btn-text').style.color = '#000';
+  }
+
+  map.on('click', function(e) {
+      if (textMode) {
+          const text = prompt("ENTER TACTICAL LABEL:");
+          if (text) {
+              const color = document.getElementById('color-picker').value;
+              const icon = L.divIcon({
+                  className: 'tactical-label',
+                  html: `<div style="color:${color}">${text}</div>`,
+                  iconSize: [null, null],
+                  iconAnchor: [10, 10]
+              });
+              const marker = L.marker(e.latlng, { icon: icon });
+              marker.options.isText = true;
+              marker.options.text = text;
+              marker.options.color = color;
+              drawnItems.addLayer(marker);
+          }
+          textMode = false;
+          document.getElementById('map').style.cursor = '';
+          document.getElementById('btn-text').style.background = '#000';
+          document.getElementById('btn-text').style.color = '#fff';
+      }
+  });
+
+  // Grid Toggle
+  let gridLayer = null;
+  function toggleGrid() {
+      if (gridLayer) {
+          map.removeLayer(gridLayer);
+          gridLayer = null;
+          document.getElementById('btn-grid').textContent = "GRID: OFF";
+      } else {
+          // Simple CSS grid overlay via a pane or just a tile layer if available. 
+          // Let's use a simple canvas grid or just visual feedback.
+          // For CoD style, let's use a dark overlay with grid lines.
+          // Since we don't have a grid tile server, we'll simulate it with a pattern or just toggle map filter.
+          document.querySelector('.leaflet-tile-pane').style.filter = 'brightness(0.2) contrast(1.5) grayscale(1) invert(1)';
+          document.getElementById('btn-grid').textContent = "GRID: ON";
+          gridLayer = true; // Flag
+      }
+  }
+
+  // 5. Data Loading Logic
+  let currentCountryName = "";
+
+  window.addEventListener('message', function(event) {
+      if (event.data.type === 'INIT_DATA') {
+          const data = event.data;
+          currentCountryName = data.countryName;
+          const tacticIndex = data.tacticIndex;
+          const countryData = data.countryData;
+          
+          if (countryData) {
+              const tactic = countryData.tactics[tacticIndex];
+              document.getElementById('info-label').textContent = `${currentCountryName.toUpperCase()} // ${tactic.name}`;
+              
+              // Clear existing
+              drawnItems.clearLayers();
+              loadShapes(tactic.data);
+              loadCountryOutline(currentCountryName);
+          }
+      }
+  });
+
+  function loadCountryOutline(name) {
+      fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson')
+        .then(res => res.json())
+        .then(data => {
+            const feature = data.features.find(f => f.properties.ADMIN === name);
+            if (feature) {
+                const layer = L.geoJSON(feature, {
+                    style: { color: '#00c8ff', weight: 2, fill: false, opacity: 0.3 }
+                }).addTo(map);
+                map.fitBounds(layer.getBounds(), { padding: [50, 50] });
+            }
+        });
+  }
+
+  function loadShapes(jsonString) {
+      if (!jsonString) return;
+      try {
+          const shapes = JSON.parse(jsonString);
+          shapes.forEach(s => {
+              let layer;
+              const color = s.color || '#00ff00';
+              const dash = s.dashArray || null;
+              const anim = s.animation || 'none';
+              const animPower = s.animationPower || 1;
+              
+              if (s.type === 'circle') {
+                  layer = L.circle([s.lat, s.lng], { radius: s.radius, color: color, fillColor: color, dashArray: dash });
+              } else if (s.type === 'line') {
+                  layer = L.polyline(s.points, { color: color, dashArray: dash });
+                  if (s.isArc) { layer.options.isArc = true; }
+              } else if (s.type === 'polygon') {
+                  layer = L.polygon(s.points, { color: color, fillColor: color, dashArray: dash });
+              } else if (s.type === 'marker') {
+                  layer = L.marker([s.lat, s.lng]);
+              } else if (s.type === 'text') {
+                  const icon = L.divIcon({
+                      className: 'tactical-label',
+                      html: `<div style="color:${color}">${s.content}</div>`,
+                      iconSize: [null, null],
+                      iconAnchor: [10, 10]
+                  });
+                  layer = L.marker([s.lat, s.lng], { icon: icon });
+                  layer.options.isText = true;
+                  layer.options.text = s.content;
+              }
+
+              if (layer) {
+                  layer.options.color = color; // Store for save
+                  layer.options.dashArray = dash;
+                  layer.options.animation = anim;
+                  layer.options.animationPower = animPower;
+                  drawnItems.addLayer(layer);
+              }
+          });
+      } catch(e) { console.error("Error parsing shapes", e); }
+  }
+
+  // 6. Save Logic (Convert Leaflet Layers -> Custom JSON)
+  function saveData() {
+    const shapes = [];
+    
+    drawnItems.eachLayer(layer => {
+        const color = layer.options.color || document.getElementById('color-picker').value;
+        const dash = layer.options.dashArray || null;
+        const anim = layer.options.animation || 'none';
+        const animPower = layer.options.animationPower || 1;
+        
+        if (layer.options.isText) {
+            shapes.push({
+                type: 'text',
+                lat: layer.getLatLng().lat,
+                lng: layer.getLatLng().lng,
+                content: layer.options.text,
+                color: color,
+                animation: anim,
+                animationPower: animPower
+            });
+        } else if (layer instanceof L.Circle && !(layer instanceof L.CircleMarker)) {
+            shapes.push({
+                type: 'circle',
+                lat: layer.getLatLng().lat,
+                lng: layer.getLatLng().lng,
+                radius: layer.getRadius(),
+                color: color,
+                dashArray: dash,
+                animation: anim,
+                animationPower: animPower
+            });
+        } else if (layer instanceof L.Polygon) {
+            // Handles Polygons AND Rectangles
+            const latlngs = layer.getLatLngs()[0].map(ll => [ll.lat, ll.lng]);
+            shapes.push({
+                type: 'polygon',
+                points: latlngs,
+                color: color,
+                dashArray: dash,
+                animation: anim,
+                animationPower: animPower
+            });
+        } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+            const latlngs = layer.getLatLngs().map(ll => [ll.lat, ll.lng]);
+            shapes.push({
+                type: 'line',
+                points: latlngs,
+                color: color,
+                dashArray: dash,
+                animation: anim,
+                animationPower: animPower,
+                isArc: layer.options.isArc || false
+            });
+        } else if (layer instanceof L.Marker) {
+            shapes.push({
+                type: 'marker',
+                lat: layer.getLatLng().lat,
+                lng: layer.getLatLng().lng,
+                color: color,
+                animation: anim,
+                animationPower: animPower
+            });
+        }
+    });
+
+    // Send back to parent
+    window.parent.postMessage({
+        type: 'SAVE_DATA',
+        shapes: shapes
+    }, '*');
+  }
+
+  function closeEditor() {
+      window.parent.postMessage({ type: 'CLOSE_EDITOR' }, '*');
+  }
+
+  // Signal ready
+  window.parent.postMessage({ type: 'EDITOR_READY' }, '*');
+  
+  // 7. Helper Functions
+  function getArcPoints(start, end) {
+      const lat1 = start.lat, lng1 = start.lng;
+      const lat2 = end.lat, lng2 = end.lng;
+      
+      // Midpoint
+      const midLat = (lat1 + lat2) / 2;
+      const midLng = (lng1 + lng2) / 2;
+      
+      // Vector
+      const dLat = lat2 - lat1;
+      const dLng = lng2 - lng1;
+      
+      // Perpendicular vector (-y, x) scaled
+      const pLat = -dLng * 0.2;
+      const pLng = dLat * 0.2;
+      
+      // Control point
+      const ctrlLat = midLat + pLat;
+      const ctrlLng = midLng + pLng;
+      
+      const points = [];
+      for(let t=0; t<=1; t+=0.05) {
+          const l = (1-t)*(1-t)*lat1 + 2*(1-t)*t*ctrlLat + t*t*lat2;
+          const g = (1-t)*(1-t)*lng1 + 2*(1-t)*t*ctrlLng + t*t*lng2;
+          points.push([l, g]);
+      }
+      return points;
+  }
+  
+  // 8. Animation Loop
+  let animTime = 0;
+  function animate() {
+      animTime += 0.008;
+      if (animTime > 1) animTime = 0;
+      
+      animLayer.clearLayers();
+      
+      drawnItems.eachLayer(layer => {
+          const anim = layer.options.animation;
+          if (!anim || anim === 'none') return;
+          
+          if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+              const latlngs = layer.getLatLngs();
+              if (latlngs.length < 2) return;
+              
+              const travelPhase = 0.85; // 85% travel, 15% explosion
+              
+              // Simple interpolation along the path points
+              // Total points
+              const totalIdx = latlngs.length - 1;
+              
+              if (animTime <= travelPhase) {
+                  const normalizedTime = animTime / travelPhase;
+                  const currentPos = normalizedTime * totalIdx;
+                  const idx = Math.floor(currentPos);
+                  const t = currentPos - idx;
+                  
+                  if (idx < totalIdx) {
+                  const p1 = latlngs[idx];
+                  const p2 = latlngs[idx+1];
+                  
+                  const lat = p1.lat + (p2.lat - p1.lat) * t;
+                  const lng = p1.lng + (p2.lng - p1.lng) * t;
+                  
+                  const color = layer.options.color || '#fff';
+                  
+                  L.circleMarker([lat, lng], {
+                      radius: 3,
+                      color: color,
+                      fillColor: '#fff',
+                      fillOpacity: 1,
+                      stroke: false
+                  }).addTo(animLayer);
+                  
+                  // Trail for missile
+                  if (anim === 'missile') {
+                      L.circleMarker([lat, lng], {
+                          radius: 4,
+                          color: '#ff0000', // Red projectile
+                          fillColor: '#ff0000',
+                          fillOpacity: 1,
+                          stroke: false
+                      }).addTo(animLayer);
+                  }
+                  }
+              } else if (anim === 'missile') {
+                  // Explosion phase
+                  const explosionTime = (animTime - travelPhase) / (1 - travelPhase); // 0 to 1
+                  const power = layer.options.animationPower || 1;
+                  const maxRadius = 10 + (power * 15); // 25px to 160px
+                  const currentRadius = explosionTime * maxRadius;
+                  const opacity = 1 - explosionTime;
+                  
+                  const lastPoint = latlngs[latlngs.length - 1];
+                  
+                  L.circleMarker(lastPoint, {
+                      radius: currentRadius,
+                      color: '#ff3333',
+                      fillColor: '#ffaa00',
+                      fillOpacity: opacity * 0.6,
+                      weight: 2,
+                      opacity: opacity
+                  }).addTo(animLayer);
+              }
+          }
+      });
+      
+      requestAnimationFrame(animate);
+  }
+  animate();
+</script>
+</body>
+</html>

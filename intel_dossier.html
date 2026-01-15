@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATLAS - Intelligence Dossier</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background: #000000;
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* ==========================================
+           BACKGROUND
+           ========================================== */
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .bg-vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.9) 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        /* ==========================================
+           HEADER
+           ========================================== */
+        #header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 55px;
+            background: rgba(0, 0, 0, 0.95);
+            border-bottom: 1px solid #151515;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 25px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .header-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logo-dot {
+            width: 6px;
+            height: 6px;
+            background: #ff3333;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+        
+        .logo-text {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 3px;
+        }
+        
+        .header-sep {
+            width: 1px;
+            height: 16px;
+            background: #222;
+        }
+        
+        .header-section {
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: #444;
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .header-time {
+            font-size: 10px;
+            color: #555;
+            letter-spacing: 1px;
+        }
+        
+        #back-btn {
+            background: transparent;
+            border: 1px solid #222;
+            color: #444;
+            padding: 7px 14px;
+            font-size: 8px;
+            letter-spacing: 2px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+        
+        #back-btn:hover {
+            border-color: #fff;
+            color: #fff;
+        }
+        
+        /* ==========================================
+           MAIN LAYOUT
+           ========================================== */
+        #main {
+            display: flex;
+            min-height: 100vh;
+            padding-top: 55px;
+            position: relative;
+            z-index: 10;
+        }
+        
+        /* ==========================================
+           LEFT SIDEBAR - TOPIC SELECTION
+           ========================================== */
+        #sidebar {
+            width: 280px;
+            min-width: 280px;
+            background: rgba(5, 5, 5, 0.9);
+            border-right: 1px solid #151515;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 55px);
+            position: sticky;
+            top: 55px;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #151515;
+        }
+        
+        .sidebar-title {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #444;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .sidebar-title::before {
+            content: '';
+            width: 4px;
+            height: 4px;
+            background: #00c8ff;
+        }
+        
+        /* Search Box */
+        .search-box {
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
+            color: #fff;
+            padding: 10px 12px 10px 35px;
+            font-family: inherit;
+            font-size: 10px;
+            letter-spacing: 1px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .search-input::placeholder {
+            color: #333;
+        }
+        
+        .search-input:focus {
+            border-color: #333;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            color: #333;
+        }
+        
+        /* Topic List */
+        .topic-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 0;
+        }
+        
+        .topic-list::-webkit-scrollbar {
+            width: 3px;
+        }
+        
+        .topic-list::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        
+        .topic-list::-webkit-scrollbar-thumb {
+            background: #222;
+        }
+        
+        .topic-category {
+            padding: 0 15px;
+            margin-bottom: 5px;
+        }
+        
+        .topic-category-title {
+            font-size: 7px;
+            letter-spacing: 2px;
+            color: #333;
+            padding: 10px 5px 5px;
+            text-transform: uppercase;
+        }
+        
+        .topic-item {
+            padding: 12px 15px;
+            cursor: pointer;
+            border-left: 2px solid transparent;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .topic-item:hover {
+            background: rgba(255, 255, 255, 0.02);
+            border-left-color: #333;
+        }
+        
+        .topic-item.active {
+            background: rgba(255, 50, 50, 0.05);
+            border-left-color: #ff3333;
+        }
+        
+        .topic-item.active .topic-name {
+            color: #fff;
+        }
+        
+        .topic-icon {
+            width: 28px;
+            height: 28px;
+            background: #111;
+            border: 1px solid #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #444;
+        }
+        
+        .topic-item.active .topic-icon {
+            border-color: #ff3333;
+            color: #ff3333;
+        }
+        
+        .topic-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .topic-name {
+            font-size: 10px;
+            font-weight: 500;
+            color: #888;
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .topic-meta {
+            font-size: 7px;
+            color: #333;
+            letter-spacing: 1px;
+        }
+        
+        .topic-badge {
+            font-size: 7px;
+            padding: 3px 6px;
+            background: rgba(255, 50, 50, 0.1);
+            border: 1px solid rgba(255, 50, 50, 0.3);
+            color: #ff3333;
+            letter-spacing: 1px;
+        }
+        
+        .topic-badge.active {
+            background: rgba(0, 255, 0, 0.1);
+            border-color: rgba(0, 255, 0, 0.3);
+            color: #00ff00;
+        }
+        
+        .topic-badge.inactive {
+            background: rgba(255, 50, 50, 0.1);
+            border-color: rgba(255, 50, 50, 0.3);
+            color: #ff3333;
+        }
+        
+        /* ==========================================
+           CONTENT AREA
+           ========================================== */
+        #content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* Welcome State */
+        #welcome-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 50px;
+            text-align: center;
+        }
+        
+        .welcome-icon {
+            width: 80px;
+            height: 80px;
+            border: 1px solid #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .welcome-icon::before {
+            content: '◇';
+            font-size: 30px;
+            color: #222;
+        }
+        
+        .welcome-icon::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 1px solid #111;
+        }
+        
+        .welcome-title {
+            font-size: 14px;
+            font-weight: 300;
+            letter-spacing: 6px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .welcome-text {
+            font-size: 10px;
+            color: #222;
+            letter-spacing: 1px;
+            max-width: 400px;
+            line-height: 1.8;
+        }
+        
+        /* Dossier View */
+        #dossier-view {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        #dossier-view.active {
+            display: flex;
+        }
+        
+        /* Dossier Header */
+        .dossier-header {
+            padding: 25px 30px;
+            background: rgba(10, 10, 10, 0.8);
+            border-bottom: 1px solid #151515;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        .dossier-title-section {
+            flex: 1;
+        }
+        
+        .dossier-classification {
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: #ff3333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .dossier-classification::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            background: #ff3333;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .dossier-title {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 4px;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        
+        .dossier-subtitle {
+            font-size: 10px;
+            color: #444;
+            letter-spacing: 2px;
+        }
+        
+        .dossier-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .dossier-btn {
+            background: transparent;
+            border: 1px solid #222;
+            color: #444;
+            padding: 10px 18px;
+            font-size: 8px;
+            letter-spacing: 2px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        
+        .dossier-btn:hover {
+            border-color: #fff;
+            color: #fff;
+        }
+        
+        .dossier-btn.primary {
+            border-color: #00c8ff;
+            color: #00c8ff;
+        }
+        
+        .dossier-btn.primary:hover {
+            background: #00c8ff;
+            color: #000;
+        }
+        
+        /* Dossier Content */
+        .dossier-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        /* Info Panel */
+        .info-panel {
+            width: 45%;
+            min-width: 400px;
+            border-right: 1px solid #151515;
+            overflow-y: auto;
+            padding: 25px 30px;
+        }
+        
+        .info-panel::-webkit-scrollbar {
+            width: 3px;
+        }
+        
+        .info-panel::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        
+        .info-panel::-webkit-scrollbar-thumb {
+            background: #222;
+        }
+        
+        /* Info Sections */
+        .info-section {
+            margin-bottom: 30px;
+        }
+        
+        .info-section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #151515;
+        }
+        
+        .info-section-icon {
+            width: 24px;
+            height: 24px;
+            background: #111;
+            border: 1px solid #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #00c8ff;
+        }
+        
+        .info-section-title {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #666;
+        }
+        
+        /* Summary Box */
+        .summary-box {
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-label {
+            font-size: 7px;
+            letter-spacing: 2px;
+            color: #444;
+            margin-bottom: 10px;
+        }
+        
+        .summary-text {
+            font-size: 11px;
+            line-height: 1.9;
+            color: #999;
+        }
+        
+        /* Quick Facts */
+        .quick-facts {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .fact-item {
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
+            padding: 15px;
+        }
+        
+        .fact-label {
+            font-size: 7px;
+            letter-spacing: 1px;
+            color: #444;
+            margin-bottom: 6px;
+        }
+        
+        .fact-value {
+            font-size: 12px;
+            font-weight: 500;
+            color: #fff;
+        }
+        
+        .fact-value.highlight {
+            color: #00c8ff;
+        }
+        
+        .fact-value.danger {
+            color: #ff3333;
+        }
+        
+        /* Key Figures */
+        .key-figures {
+            margin-bottom: 20px;
+        }
+        
+        .figure-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 12px 0;
+            border-bottom: 1px solid #111;
+        }
+        
+        .figure-item:last-child {
+            border-bottom: none;
+        }
+        
+        .figure-avatar {
+            width: 40px;
+            height: 40px;
+            background: #111;
+            border: 1px solid #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .figure-info {
+            flex: 1;
+        }
+        
+        .figure-name {
+            font-size: 10px;
+            font-weight: 500;
+            color: #ccc;
+            margin-bottom: 3px;
+        }
+        
+        .figure-role {
+            font-size: 8px;
+            color: #444;
+            letter-spacing: 1px;
+        }
+        
+        .figure-status {
+            font-size: 7px;
+            padding: 3px 8px;
+            border: 1px solid;
+        }
+        
+        .figure-status.active {
+            color: #00ff00;
+            border-color: #00ff00;
+            background: rgba(0, 255, 0, 0.05);
+        }
+        
+        .figure-status.deceased {
+            color: #666;
+            border-color: #333;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 20px;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: #1a1a1a;
+        }
+        
+        .timeline-item {
+            position: relative;
+            padding-bottom: 20px;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -18px;
+            top: 5px;
+            width: 7px;
+            height: 7px;
+            background: #111;
+            border: 1px solid #333;
+        }
+        
+        .timeline-item.highlight::before {
+            border-color: #ff3333;
+            background: rgba(255, 50, 50, 0.3);
+        }
+        
+        .timeline-year {
+            font-size: 9px;
+            font-weight: 700;
+            color: #00c8ff;
+            margin-bottom: 5px;
+        }
+        
+        .timeline-text {
+            font-size: 10px;
+            line-height: 1.6;
+            color: #666;
+        }
+        
+        /* ==========================================
+           MAP PANEL
+           ========================================== */
+        .map-panel {
+            flex: 1;
+            position: relative;
+            background: #050505;
+            overflow: hidden;
+        }
+        
+        #flat-map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Map Overlay UI */
+        .map-overlay-tl {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 50;
+        }
+        
+        .map-title {
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #444;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .map-title::before {
+            content: '';
+            width: 4px;
+            height: 4px;
+            background: #00c8ff;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .map-legend {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #1a1a1a;
+            padding: 12px 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 8px;
+            color: #555;
+        }
+        
+        .legend-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .legend-dot.hq {
+            background: #ff3333;
+        }
+        
+        .legend-dot.branch {
+            background: #00c8ff;
+        }
+        
+        .legend-dot.influence {
+            background: #ffaa00;
+        }
+        
+        .map-overlay-br {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 50;
+        }
+        
+        .map-coords {
+            font-size: 8px;
+            letter-spacing: 1px;
+            color: #333;
+            text-align: right;
+        }
+        
+        /* Map Corner Markers */
+        .map-corner {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border-color: #1a1a1a;
+            border-style: solid;
+            z-index: 40;
+        }
+        
+        .map-corner.tl { top: 10px; left: 10px; border-width: 1px 0 0 1px; }
+        .map-corner.tr { top: 10px; right: 10px; border-width: 1px 1px 0 0; }
+        .map-corner.bl { bottom: 10px; left: 10px; border-width: 0 0 1px 1px; }
+        .map-corner.br { bottom: 10px; right: 10px; border-width: 0 1px 1px 0; }
+        
+        /* ==========================================
+           LEAFLET CUSTOMIZATION
+           ========================================== */
+        .leaflet-container {
+            background: #050505 !important;
+        }
+        
+        .leaflet-control-zoom,
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+        
+        /* Custom Map Markers */
+        .custom-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .marker-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid;
+            animation: markerPulse 2s infinite;
+        }
+        
+        .marker-dot.hq {
+            background: rgba(255, 50, 50, 0.5);
+            border-color: #ff3333;
+        }
+        
+        .marker-dot.branch {
+            background: rgba(0, 200, 255, 0.5);
+            border-color: #00c8ff;
+        }
+        
+        @keyframes markerPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+        }
+        
+        /* ==========================================
+           RESPONSIVE
+           ========================================== */
+        @media (max-width: 1200px) {
+            .info-panel {
+                width: 50%;
+                min-width: 350px;
+            }
+        }
+        
+        @media (max-width: 900px) {
+            #sidebar {
+                width: 220px;
+                min-width: 220px;
+            }
+            
+            .dossier-content {
+                flex-direction: column;
+            }
+            
+            .info-panel {
+                width: 100%;
+                min-width: 0;
+                max-height: 50vh;
+                border-right: none;
+                border-bottom: 1px solid #151515;
+            }
+            
+            .map-panel {
+                min-height: 300px;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <!-- Background -->
+    <div class="bg-grid"></div>
+    <div class="bg-vignette"></div>
+    
+    <!-- Header -->
+    <header id="header">
+        <div class="header-left">
+            <div class="header-logo">
+                <div class="logo-dot"></div>
+                <span class="logo-text">ATLAS</span>
+            </div>
+            <div class="header-sep"></div>
+            <span class="header-section">INTELLIGENCE DOSSIER</span>
+        </div>
+        <div class="header-right">
+            <span class="header-time" id="header-time">--:--:-- UTC</span>
+            <button id="back-btn" onclick="goBack()">← RETURN</button>
+        </div>
+    </header>
+    
+    <!-- Main Layout -->
+    <main id="main">
+        <!-- Sidebar - Topic Selection -->
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">SELECT DOSSIER</div>
+                <div class="search-box">
+                    <span class="search-icon">⌕</span>
+                    <input type="text" class="search-input" placeholder="Search topics..." id="search-input" oninput="filterTopics()">
+                </div>
+            </div>
+            <div class="topic-list" id="topic-list">
+                <!-- Topics loaded here -->
+            </div>
+        </aside>
+        
+        <!-- Content Area -->
+        <div id="content">
+            <!-- Welcome State -->
+            <div id="welcome-state">
+                <div class="welcome-icon"></div>
+                <h2 class="welcome-title">SELECT A DOSSIER</h2>
+                <p class="welcome-text">Choose a topic from the sidebar to view detailed intelligence information, key figures, timeline, and geographic visualization.</p>
+            </div>
+            
+            <!-- Dossier View -->
+            <div id="dossier-view">
+                <div class="dossier-header">
+                    <div class="dossier-title-section">
+                        <div class="dossier-classification" id="dossier-classification">CLASSIFIED</div>
+                        <h1 class="dossier-title" id="dossier-title">DOSSIER TITLE</h1>
+                        <div class="dossier-subtitle" id="dossier-subtitle">SUBTITLE</div>
+                    </div>
+                    <div class="dossier-actions">
+                        <button class="dossier-btn" onclick="exportDossier()">EXPORT</button>
+                        <button class="dossier-btn primary" onclick="printDossier()">PRINT REPORT</button>
+                    </div>
+                </div>
+                
+                <div class="dossier-content">
+                    <!-- Info Panel -->
+                    <div class="info-panel">
+                        <!-- Overview Section -->
+                        <div class="info-section">
+                            <div class="info-section-header">
+                                <div class="info-section-icon">◈</div>
+                                <span class="info-section-title">EXECUTIVE SUMMARY</span>
+                            </div>
+                            <div class="summary-box">
+                                <div class="summary-label">OVERVIEW</div>
+                                <p class="summary-text" id="summary-text">Loading...</p>
+                            </div>
+                            <div class="quick-facts" id="quick-facts">
+                                <!-- Quick facts loaded here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Key Figures Section -->
+                        <div class="info-section">
+                            <div class="info-section-header">
+                                <div class="info-section-icon">◉</div>
+                                <span class="info-section-title">KEY FIGURES</span>
+                            </div>
+                            <div class="key-figures" id="key-figures">
+                                <!-- Key figures loaded here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Timeline Section -->
+                        <div class="info-section">
+                            <div class="info-section-header">
+                                <div class="info-section-icon">◫</div>
+                                <span class="info-section-title">HISTORICAL TIMELINE</span>
+                            </div>
+                            <div class="timeline" id="timeline">
+                                <!-- Timeline loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Map Panel -->
+                    <div class="map-panel">
+                        <div class="map-corner tl"></div>
+                        <div class="map-corner tr"></div>
+                        <div class="map-corner bl"></div>
+                        <div class="map-corner br"></div>
+                        
+                        <div class="map-overlay-tl">
+                            <div class="map-title">GEOGRAPHIC VISUALIZATION</div>
+                            <div class="map-legend">
+                                <div class="legend-item">
+                                    <div class="legend-dot hq"></div>
+                                    <span>HEADQUARTERS</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-dot branch"></div>
+                                    <span>MAJOR PRESENCE</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-dot influence"></div>
+                                    <span>AREA OF INFLUENCE</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="map-overlay-br">
+                            <div class="map-coords" id="map-coords">LAT 0.00 | LNG 0.00</div>
+                        </div>
+                        
+                        <div id="flat-map"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="http://localhost:3001/atlas-api.js"></script>
+    <script>
+        // ==========================================
+        // DOSSIER DATA
+        // ==========================================
+        
+        let dossiers = []; // Will be loaded from API
+        let currentDossier = null;
+        let map = null;
+        let markers = [];
+        
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
+        
+        async function init() {
+            await loadDossiers();
+            updateTime();
+            setInterval(updateTime, 1000);
+            initMap();
+            
+            // Request data if opened in iframe via ATLAS
+            if (window.parent !== window) {
+                const params = new URLSearchParams(window.location.search);
+                const country = params.get('country');
+                if (country) {
+                    window.parent.postMessage({ type: 'REQUEST_DATA', country: country }, '*');
+                }
+            }
+        }
+        
+        function updateTime() {
+            document.getElementById('header-time').textContent = 
+                new Date().toISOString().substring(11, 19) + ' UTC';
+        }
+        
+        // ==========================================
+        // TOPIC LIST
+        // ==========================================
+        
+        async function loadDossiers() {
+            try {
+                const response = await ATLAS_API.getDossiers();
+                dossiers = response.data || [];
+                renderTopicList();
+            } catch (e) {
+                console.error("Failed to load dossiers:", e);
+                document.getElementById('topic-list').innerHTML = '<div style="padding:20px; color:#666; font-size:10px;">Failed to load dossiers.</div>';
+            }
+        }
+
+        function renderTopicList() {
+            const container = document.getElementById('topic-list');
+            
+            // Group by category
+            const categories = {};
+            dossiers.forEach(d => {
+                if (!categories[d.category]) {
+                    categories[d.category] = [];
+                }
+                categories[d.category].push(d);
+            });
+            
+            let html = '';
+            Object.keys(categories).forEach(cat => {
+                html += `
+                    <div class="topic-category">
+                        <div class="topic-category-title">${cat}</div>
+                        ${categories[cat].map(d => `
+                            <div class="topic-item" data-id="${d.id}" onclick="selectDossier('${d.id}')">
+                                <div class="topic-icon">${d.name ? d.name.charAt(0) : '?'}</div>
+                                <div class="topic-info">
+                                    <div class="topic-name">${d.name}</div>
+                                    <div class="topic-meta">${d.locations?.length || 0} LOCATIONS</div>
+                                </div>
+                                <div class="topic-badge ${d.isActive ? 'active' : 'inactive'}">${d.isActive ? 'AKTIV' : 'INAKTIV'}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function filterTopics() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const items = document.querySelectorAll('.topic-item');
+            
+            items.forEach(item => {
+                const name = item.querySelector('.topic-name').textContent.toLowerCase();
+                item.style.display = name.includes(query) ? 'flex' : 'none';
+            });
+        }
+        
+        // ==========================================
+        // DOSSIER SELECTION
+        // ==========================================
+        
+        async function selectDossier(id) {
+            // Find summary from list first
+            const dossierSummary = dossiers.find(d => d.id === id);
+            if (!dossierSummary) return;
+
+            // Update active state
+            document.querySelectorAll('.topic-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.id === id);
+            });
+
+            try {
+                const response = await ATLAS_API.getDossier(id);
+                currentDossier = response.data;
+            } catch (e) {
+                console.error("Failed to load full dossier:", e);
+                return;
+            }
+
+            // Hide welcome, show dossier
+            document.getElementById('welcome-state').style.display = 'none';
+            document.getElementById('dossier-view').classList.add('active');
+            
+            // Fix map rendering when container becomes visible
+            if (map) map.invalidateSize();
+            
+            // Populate content
+            document.getElementById('dossier-classification').textContent = currentDossier.classification;
+            document.getElementById('dossier-title').textContent = currentDossier.name.toUpperCase();
+            document.getElementById('dossier-subtitle').textContent = currentDossier.subtitle;
+            document.getElementById('summary-text').textContent = currentDossier.summary;
+            
+            // Quick Facts
+            const factsHtml = currentDossier.facts?.map(f => `
+                <div class="fact-item">
+                    <div class="fact-label">${f.label}</div>
+                    <div class="fact-value ${f.highlight ? 'highlight' : ''} ${f.danger ? 'danger' : ''}">${f.value}</div>
+                </div>
+            `).join('') || '';
+            document.getElementById('quick-facts').innerHTML = factsHtml;
+            
+            // Key Figures
+            const figuresHtml = currentDossier.figures?.map(f => `
+                <div class="figure-item">
+                    <div class="figure-avatar">${f.initials}</div>
+                    <div class="figure-info">
+                        <div class="figure-name">${f.name}</div>
+                        <div class="figure-role">${f.role}</div>
+                    </div>
+                    <div class="figure-status ${f.status}">${f.status.toUpperCase()}</div>
+                </div>
+            `).join('') || '';
+            document.getElementById('key-figures').innerHTML = figuresHtml;
+            
+            // Timeline
+            const timelineHtml = currentDossier.timeline?.map(t => `
+                <div class="timeline-item ${t.highlight ? 'highlight' : ''}">
+                    <div class="timeline-year">${t.year}</div>
+                    <div class="timeline-text">${t.text}</div>
+                </div>
+            `).join('') || '';
+            document.getElementById('timeline').innerHTML = timelineHtml;
+            
+            // Update map
+            updateMapMarkers();
+        }
+        
+        // ==========================================
+        // MAP
+        // ==========================================
+        
+        function initMap() {
+            map = L.map('flat-map', {
+                zoomControl: false,
+                attributionControl: false,
+                minZoom: 2,
+                maxZoom: 8
+            }).setView([30, 0], 2);
+            
+            // Dark style tiles
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Track mouse position
+            map.on('mousemove', function(e) {
+                document.getElementById('map-coords').textContent = 
+                    `LAT ${e.latlng.lat.toFixed(2)} | LNG ${e.latlng.lng.toFixed(2)}`;
+            });
+        }
+        
+        function updateMapMarkers() {
+            // Clear existing markers
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            
+            if (!currentDossier?.locations) return;
+            
+            // Add new markers
+            currentDossier.locations.forEach(loc => {
+                const markerHtml = `
+                    <div class="custom-marker">
+                        <div class="marker-dot ${loc.type}"></div>
+                    </div>
+                `;
+                
+                const icon = L.divIcon({
+                    html: markerHtml,
+                    className: '',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+                
+                const marker = L.marker([loc.lat, loc.lng], { icon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 1px;">
+                            <strong>${loc.name}</strong><br>
+                            <span style="color: #666;">${loc.type.toUpperCase()}</span>
+                        </div>
+                    `);
+                
+                markers.push(marker);
+            });
+            
+            // Fit bounds to markers
+            if (markers.length > 0) {
+                const group = L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.3));
+            }
+        }
+        
+        // ==========================================
+        // ACTIONS
+        // ==========================================
+        
+        function exportDossier() {
+            if (!currentDossier) return;
+            alert(`Exporting dossier: ${currentDossier.name}\n\nThis feature would export the dossier as PDF or JSON.`);
+        }
+        
+        function printDossier() {
+            if (!currentDossier) return;
+            window.print();
+        }
+        
+        function goBack() {
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'CLOSE_MODULE' }, '*');
+            } else {
+                window.history.back();
+            }
+        }
+        
+        // ESC to go back
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                goBack();
+            }
+        });
+        
+        // ==========================================
+        // DATA SYNC
+        // ==========================================
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'COUNTRY_DATA') {
+                const data = event.data.data;
+                const countryName = new URLSearchParams(window.location.search).get('country');
+                
+                if (data && countryName) {
+                    // Create dynamic dossier from ATLAS data
+                    const dynamicDossier = {
+                        id: 'dynamic_' + countryName.replace(/\s+/g, '_').toLowerCase(),
+                        name: countryName,
+                        category: 'NATIONAL DOSSIER',
+                        classification: 'SECRET',
+                        isActive: true,
+                        subtitle: data.region || 'REGION UNKNOWN',
+                        summary: `Intelligence dossier generated for ${countryName}.\n\nGovernment: ${data.intel?.regierung || 'Unknown'}\nHead of State: ${data.intel?.staatsoberhaupt || 'Unknown'}\nConflict Status: ${data.intel?.konflikt || 'None'}`,
+                        facts: [
+                            { label: 'POPULATION', value: data.demo?.bevoelkerung || 'N/A', highlight: false },
+                            { label: 'MILITARY', value: data.security?.militaerausgaben || 'N/A', highlight: true },
+                            { label: 'STABILITY', value: (data.intel?.stabilitaet || 'Unknown').toUpperCase(), danger: data.intel?.stabilitaet === 'critical' }
+                        ],
+                        figures: [],
+                        timeline: [],
+                        locations: []
+                    };
+                    
+                    // Add to list and select
+                    dossiers.unshift(dynamicDossier);
+                    renderTopicList();
+                    selectDossier(dynamicDossier.id);
+                }
+            }
+        });
+        
+        // ==========================================
+        // START
+        // ==========================================
+        
+        init();
+    </script>
+</body>
+</html>
